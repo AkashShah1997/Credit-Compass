@@ -22,6 +22,7 @@ import {
   daysUntil,
   formatDate,
   formatDateShort,
+  monthKey,
   monthLabel,
   nextDueDate,
   relativeDay,
@@ -38,12 +39,13 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { TableWrap, Td, Th, Tr } from '../components/ui/Table'
 import { ConfirmDialog, Modal } from '../components/ui/Modal'
 import { CurrencyInput, Field, TextInput } from '../components/ui/Field'
+import { Segmented } from '../components/ui/Tabs'
 import { useToast } from '../components/ui/Toast'
 import { ChartFrame } from '../components/charts/ChartFrame'
 import { ColumnChart } from '../components/charts/ColumnChart'
 import { hrefFor } from '../hooks/useRouter'
 import { cn } from '../lib/cn'
-import type { CreditCard } from '../types'
+import { CREDIT_ACCOUNT_KINDS, type CreditAccountKind, type CreditCard } from '../types'
 
 /** The utilisation band credit bureaus actually reward. */
 const HEALTHY_UTILISATION = 30
@@ -711,6 +713,18 @@ function CardTile({
         </div>
       </div>
 
+      {card.openedDate || card.apr != null || card.kind ? (
+        <p className="text-[11.5px] text-muted">
+          {[
+            card.kind ?? 'Credit Card',
+            card.openedDate ? `opened ${monthLabel(monthKey(card.openedDate))}` : null,
+            card.apr != null ? `${formatPercent(card.apr, 2)} APR` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      ) : null}
+
       <div className="mt-auto flex flex-wrap items-center gap-2">
         <Button
           size="sm"
@@ -734,7 +748,17 @@ function CardTile({
 
 /* -------------------------------------------------------------------------- */
 
-type FormField = 'name' | 'issuer' | 'last4' | 'creditLimit' | 'outstanding' | 'minimumDue' | 'statementDay' | 'billDueDay'
+type FormField =
+  | 'name'
+  | 'issuer'
+  | 'last4'
+  | 'creditLimit'
+  | 'outstanding'
+  | 'minimumDue'
+  | 'statementDay'
+  | 'billDueDay'
+  | 'apr'
+  | 'openedDate'
 type FormErrors = Partial<Record<FormField, string>>
 
 /** Numeric inputs are held as strings so a field can be genuinely empty. */
@@ -742,11 +766,14 @@ interface FormValues {
   name: string
   issuer: string
   last4: string
+  kind: CreditAccountKind
   creditLimit: string
   outstanding: string
   minimumDue: string
+  apr: string
   statementDay: string
   billDueDay: string
+  openedDate: string
 }
 
 function toValues(card: CreditCard | null): FormValues {
@@ -754,11 +781,14 @@ function toValues(card: CreditCard | null): FormValues {
     name: card?.name ?? '',
     issuer: card?.issuer ?? '',
     last4: card?.last4 ?? '',
+    kind: card?.kind ?? 'Credit Card',
     creditLimit: card ? String(card.creditLimit) : '',
     outstanding: card ? String(card.outstanding) : '',
     minimumDue: card ? String(card.minimumDue) : '',
+    apr: card?.apr != null ? String(card.apr) : '',
     statementDay: card ? String(card.statementDay) : '1',
     billDueDay: card ? String(card.billDueDay) : '18',
+    openedDate: card?.openedDate ?? '',
   }
 }
 
@@ -793,6 +823,13 @@ function validate(values: FormValues): FormErrors {
     errors.statementDay = 'Pick a day between 1 and 28.'
   if (!Number.isFinite(billDueDay) || billDueDay < 1 || billDueDay > 28)
     errors.billDueDay = 'Pick a day between 1 and 28.'
+
+  // Both optional — but if given, they have to make sense.
+  if (values.apr.trim()) {
+    const apr = num(values.apr)
+    if (!Number.isFinite(apr) || apr < 0 || apr > 100) errors.apr = 'Enter the annual rate as a percentage, 0–100.'
+  }
+  if (values.openedDate && values.openedDate > todayISO()) errors.openedDate = 'The opening date cannot be in the future.'
 
   return errors
 }
@@ -831,11 +868,14 @@ function CardFormModal({ card, onClose }: { card: CreditCard | null; onClose: ()
       name: values.name.trim(),
       issuer: values.issuer.trim(),
       last4: values.last4.trim(),
+      kind: values.kind,
       creditLimit: num(values.creditLimit),
       outstanding: num(values.outstanding),
       minimumDue: num(values.minimumDue),
+      apr: values.apr.trim() ? num(values.apr) : undefined,
       statementDay: num(values.statementDay),
       billDueDay: num(values.billDueDay),
+      openedDate: values.openedDate || undefined,
     }
 
     if (card) {
@@ -890,6 +930,21 @@ function CardFormModal({ card, onClose }: { card: CreditCard | null; onClose: ()
               placeholder="CIBC"
               autoComplete="off"
               onChange={(event) => set('issuer')(event.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field
+          label="Account type"
+          className="sm:col-span-2"
+          hint="A line of credit is revolving too — its balance counts toward utilization the same way."
+        >
+          {() => (
+            <Segmented
+              ariaLabel="Account type"
+              value={values.kind}
+              onChange={(kind) => setValues((current) => ({ ...current, kind }))}
+              options={CREDIT_ACCOUNT_KINDS.map((option) => ({ value: option, label: option }))}
             />
           )}
         </Field>
@@ -975,6 +1030,41 @@ function CardFormModal({ card, onClose }: { card: CreditCard | null; onClose: ()
               invalid={Boolean(errors.billDueDay)}
               className="tabular"
               onChange={(event) => set('billDueDay')(event.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field
+          label="Opened"
+          error={errors.openedDate}
+          hint="Optional — feeds the length-of-history factor on the credit page."
+        >
+          {(id) => (
+            <TextInput
+              id={id}
+              type="date"
+              max={todayISO()}
+              value={values.openedDate}
+              invalid={Boolean(errors.openedDate)}
+              onChange={(event) => set('openedDate')(event.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field label="Interest rate (APR)" error={errors.apr} hint="Optional — shows what carrying a balance costs.">
+          {(id) => (
+            <TextInput
+              id={id}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={100}
+              step="0.01"
+              className="tabular"
+              value={values.apr}
+              invalid={Boolean(errors.apr)}
+              placeholder="20.99"
+              onChange={(event) => set('apr')(event.target.value)}
             />
           )}
         </Field>

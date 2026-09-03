@@ -24,13 +24,18 @@ export interface TrendSeries {
 }
 
 export interface TrendChartProps {
-  data: Record<string, string | number>[]
+  /** `null` leaves a gap in the line — a month with no reading, not a zero. */
+  data: Record<string, string | number | null>[]
   xKey: string
   series: TrendSeries[]
   format?: (value: number) => string
   yTickFormat?: (value: number) => string
   /** Horizontal marker, e.g. an average or a target. */
   reference?: { value: number; label: string }
+  /** Vertical markers at category values — events on a timeline. */
+  markers?: { x: string | number; label: string }[]
+  /** Explicit y-range; the default starts at zero, which flattens a 300–900 score. */
+  yDomain?: [number | string, number | string]
   /** Extra tooltip line, e.g. "Net +$1,240". */
   renderTooltipFooter?: (payload: readonly TooltipItem[]) => React.ReactNode
   stacked?: boolean
@@ -43,6 +48,8 @@ export function TrendChart({
   format = formatCurrency,
   yTickFormat = formatCompactCurrency,
   reference,
+  markers,
+  yDomain,
   renderTooltipFooter,
   stacked,
 }: TrendChartProps) {
@@ -66,6 +73,7 @@ export function TrendChart({
           axisLine={false}
           tick={{ fill: theme.tick, fontSize: 11 }}
           tickFormatter={yTickFormat}
+          domain={yDomain}
           width={56}
         />
         <Tooltip
@@ -93,6 +101,15 @@ export function TrendChart({
             }}
           />
         ) : null}
+        {markers?.map((marker) => (
+          <ReferenceLine
+            key={`${marker.x}-${marker.label}`}
+            x={marker.x}
+            stroke={theme.axis}
+            strokeDasharray="3 3"
+            label={{ value: marker.label, position: 'insideTop', fill: theme.tick, fontSize: 10 }}
+          />
+        ))}
 
         {series.map((s) =>
           s.kind === 'line' ? (

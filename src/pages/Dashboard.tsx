@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   CalendarClock,
   CreditCard,
+  Gauge,
   Landmark,
   PiggyBank,
   Shield,
@@ -29,6 +30,7 @@ import {
   summariseLoan,
   transactionsInMonth,
 } from '../lib/finance'
+import { creditOverview } from '../lib/credit'
 import { currentMonthKey, formatDate, monthShort, monthRange, nextDueDate, relativeDay } from '../lib/date'
 import {
   formatCompactCurrency,
@@ -111,6 +113,8 @@ export default function Dashboard() {
           </>
         }
       />
+
+      <CreditStrip />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Hero: the one ≥48px figure on this view. */}
@@ -459,6 +463,68 @@ export default function Dashboard() {
 }
 
 /* -------------------------------------------------------------------------- */
+
+/** One-line bridge to the home page: score, utilization, and the next step. */
+function CreditStrip() {
+  const state = useAppState()
+  const overview = useMemo(() => creditOverview(state), [state])
+  const { trend, band, utilisation, recommendations } = overview
+  const next = recommendations[0]
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
+        <div className="flex shrink-0 items-center gap-3 lg:w-60">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand-ink">
+            <Gauge className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[12px] text-muted">Credit score</p>
+            <p className="flex items-center gap-2">
+              <span className="tabular text-[22px] leading-none font-semibold tracking-[-0.02em] text-ink">
+                {trend.latest ? trend.latest.score : '—'}
+              </span>
+              {band ? <StatusBadge status={band.tone}>{band.label}</StatusBadge> : null}
+            </p>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-3 text-[12.5px]">
+            <span className="text-muted">Utilization</span>
+            <span className={cn('tabular font-medium', utilisation.tone === 'good' ? 'text-ink' : 'text-negative')}>
+              {utilisation.accounts.length ? formatPercent(utilisation.percent, 0) : '—'}
+            </span>
+          </div>
+          <ProgressBar
+            className="mt-1.5"
+            value={utilisation.percent}
+            tone={utilisation.tone}
+            markers={[10, 30]}
+            label="Credit utilization across all cards"
+          />
+        </div>
+
+        {next ? (
+          <div className="min-w-0 flex-1 lg:max-w-md">
+            <p className="text-[11.5px] text-muted">Next step</p>
+            <p className="truncate text-[13.5px] font-medium text-ink">{next.title}</p>
+          </div>
+        ) : null}
+
+        <Button
+          size="sm"
+          variant="primary"
+          className="shrink-0"
+          iconEnd={<ArrowRight className="h-4 w-4" />}
+          onClick={() => (window.location.hash = hrefFor('/'))}
+        >
+          Credit health
+        </Button>
+      </div>
+    </Card>
+  )
+}
 
 function EmergencyFundCard({ goal }: { goal: ReturnType<typeof emergencyFund> }) {
   if (!goal) {

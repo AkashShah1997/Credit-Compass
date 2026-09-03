@@ -466,6 +466,19 @@ function ProfileCard() {
             )}
           </Field>
         </div>
+
+        <NumberSetting
+          label="Credit score goal"
+          min={300}
+          max={900}
+          step={5}
+          value={settings.creditScoreGoal}
+          hint="The line the credit page measures you against. 760 and up is “excellent” at both Equifax and TransUnion, and where the best lending rates start."
+          onCommit={(next) => {
+            updateSettings({ creditScoreGoal: next })
+            toast.success(`Score goal set to ${next}.`)
+          }}
+        />
       </div>
     </Card>
   )
@@ -753,7 +766,7 @@ function AboutCard() {
     <Card className="lg:col-span-5">
       <CardHeader
         title="About CreditCompass"
-        subtitle={`Personal finance, version ${state.version}.0`}
+        subtitle={`Credit health & money, version ${state.version}.0`}
         icon={<Sparkles className="h-4 w-4" />}
       />
 
@@ -764,9 +777,9 @@ function AboutCard() {
             What it tracks
           </dt>
           <dd className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
-            Income and expenses, category budgets, savings goals, investments and recurring contributions, loan amortisation, credit
-            card cycles, manual assets and liabilities — rolled into net worth, a cash-flow forecast and a
-            financial-independence projection.
+            Your credit score over time, utilization on every card, hard inquiries and the five factors behind the
+            number — plus income and expenses, budgets, savings goals, investments, loan amortisation, card
+            cycles and net worth, with a cash-flow forecast and a financial-independence projection.
           </dd>
         </div>
 

@@ -2,6 +2,7 @@ import {
   CreditCard,
   Compass,
   FileBarChart,
+  Gauge,
   Landmark,
   LayoutDashboard,
   PiggyBank,
@@ -31,7 +32,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Overview',
     items: [
-      { path: '/', label: 'Dashboard', icon: LayoutDashboard, description: 'Balance, cash flow and this month at a glance' },
+      { path: '/', label: 'Credit health', short: 'Credit', icon: Gauge, description: 'Score, utilization and what to do next' },
+      { path: '/overview', label: 'Money overview', short: 'Money', icon: LayoutDashboard, description: 'Balance, cash flow and this month at a glance' },
       { path: '/transactions', label: 'Transactions', short: 'Activity', icon: ArrowLeftRight, description: 'Every income and expense entry' },
       { path: '/reports', label: 'Reports', icon: FileBarChart, description: 'Monthly and yearly analysis, PDF and Excel export' },
     ],
@@ -70,7 +72,7 @@ export const SETTINGS_ITEM: NavItem = {
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((group) => group.items), SETTINGS_ITEM]
 
 /** The four routes that get a permanent slot in the mobile tab bar. */
-export const MOBILE_PRIMARY = ['/', '/transactions', '/budget', '/investments']
+export const MOBILE_PRIMARY = ['/', '/overview', '/transactions', '/cards']
 
 export function navItemFor(path: string): NavItem | undefined {
   return ALL_NAV_ITEMS.find((item) => item.path === path)

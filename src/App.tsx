@@ -8,11 +8,12 @@ import { useRouter } from './hooks/useRouter'
 import { Button } from './components/ui/Button'
 import { EmptyState } from './components/ui/EmptyState'
 
-// The dashboard is the landing route, so it ships in the main bundle. Every
+// Credit health is the landing route, so it ships in the main bundle. Every
 // other page is fetched on first visit — the chunk lands well inside the
 // navigation, and the initial parse stays small.
-import Dashboard from './pages/Dashboard'
+import Credit from './pages/Credit'
 
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Budget = lazy(() => import('./pages/Budget'))
 const Savings = lazy(() => import('./pages/Savings'))
@@ -45,6 +46,8 @@ function Routes() {
   const page = (() => {
     switch (router.path) {
       case '/':
+        return <Credit />
+      case '/overview':
         return <Dashboard />
       case '/transactions':
         return <Transactions query={router.query} />
@@ -74,7 +77,7 @@ function Routes() {
             message={`Nothing lives at “${router.path}”.`}
             action={
               <Button variant="primary" onClick={() => router.navigate('/')}>
-                Back to dashboard
+                Back to credit health
               </Button>
             }
           />

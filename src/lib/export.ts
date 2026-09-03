@@ -25,6 +25,7 @@ import {
 import { formatDate, monthLabel, monthRange, todayISO } from './date'
 import { formatCurrency } from './format'
 import { APP_NAME, FILE_PREFIX } from './brand'
+import { accountUtilisation, sortedScores } from './credit'
 
 const BRAND: [number, number, number] = [42, 120, 214]
 const INK: [number, number, number] = [11, 15, 25]
@@ -488,6 +489,44 @@ export async function exportWorkbook(
       [24, 18, 14, 10, 13, 8, 9, 15, 13],
     ),
     'Debt',
+  )
+
+  XLSX.utils.book_append_sheet(
+    book,
+    sheetFromRows(
+      XLSX,
+      [
+        ['Date', 'Bureau', 'Score', 'Source', 'Note'],
+        ...sortedScores(state.creditScores).map((entry) => [
+          entry.date,
+          entry.bureau,
+          entry.score,
+          entry.source ?? '',
+          entry.note ?? '',
+        ]),
+        [],
+        ['Account', 'Kind', 'Limit', 'Balance', 'Utilization %', 'Statement day', 'Opened'],
+        ...state.cards.map((card) => {
+          const util = accountUtilisation(card)
+          return [
+            card.name,
+            card.kind ?? 'Credit Card',
+            card.creditLimit,
+            card.outstanding,
+            Number(util.percent.toFixed(1)),
+            card.statementDay,
+            card.openedDate ?? '',
+          ]
+        }),
+        [],
+        ['Inquiry date', 'Lender', 'Purpose', 'Bureau'],
+        ...[...state.inquiries]
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .map((inquiry) => [inquiry.date, inquiry.lender, inquiry.purpose, inquiry.bureau ?? '']),
+      ],
+      [14, 14, 10, 16, 16, 14, 12],
+    ),
+    'Credit',
   )
 
   XLSX.writeFile(book, filename)

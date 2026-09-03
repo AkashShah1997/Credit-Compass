@@ -21,16 +21,19 @@ export interface ProgressBarProps {
   className?: string
   /** A second, lighter mark behind the fill — e.g. "where you should be". */
   marker?: number
+  /** Several marks at once — e.g. the 10% and 30% utilization lines. */
+  markers?: number[]
 }
 
 /**
  * Meter. The fill carries severity; the track is a translucent step of the
  * same hue so the state reads across the whole bar, not just the filled part.
  */
-export function ProgressBar({ value, tone = 'brand', size = 'md', label, className, marker }: ProgressBarProps) {
+export function ProgressBar({ value, tone = 'brand', size = 'md', label, className, marker, markers }: ProgressBarProps) {
   const pct = Math.max(0, Math.min(100, value))
   const height = size === 'sm' ? 'h-1.5' : size === 'lg' ? 'h-3' : 'h-2'
   const color = FILL[tone]
+  const ticks = [marker, ...(markers ?? [])].filter((m): m is number => m != null && m > 0 && m < 100)
 
   return (
     <div
@@ -46,13 +49,14 @@ export function ProgressBar({ value, tone = 'brand', size = 'md', label, classNa
         className="h-full rounded-full transition-[width] duration-500 ease-out"
         style={{ width: `${pct}%`, backgroundColor: color }}
       />
-      {marker != null && marker > 0 && marker < 100 ? (
+      {ticks.map((tick) => (
         <span
+          key={tick}
           aria-hidden="true"
           className="absolute inset-y-0 w-0.5 rounded-full bg-ink/35"
-          style={{ left: `${Math.min(100, marker)}%` }}
+          style={{ left: `${tick}%` }}
         />
-      ) : null}
+      ))}
     </div>
   )
 }
