@@ -7,14 +7,17 @@
  * a consumer API — the modal makes that a twenty-second job once a month.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  Bot,
   CalendarClock,
   Clock,
+  Copy,
   CreditCard,
+  Download,
   Gauge,
   History,
   Landmark,
@@ -40,16 +43,25 @@ import {
   type Timing,
 } from '../lib/credit'
 import { formatDate, formatDateShort, monthKey, monthRange, monthShort, todayISO } from '../lib/date'
-import { formatCurrency, formatPercent, formatTenure } from '../lib/format'
+import { formatCurrency, formatNumber, formatPercent, formatTenure } from '../lib/format'
 import { FLOW_COLORS, seriesColor } from '../lib/palette'
-import { CREDIT_BUREAUS, SCORE_SOURCES, type CreditBureau, type CreditInquiry, type CreditScoreEntry } from '../types'
+import { FILE_PREFIX } from '../lib/brand'
+import { DEFAULT_PROMPT_OPTIONS, buildCreditPrompt, promptStats, type PromptOptions } from '../lib/prompt'
+import {
+  CREDIT_BUREAUS,
+  SCORE_SOURCES,
+  type AppState,
+  type CreditBureau,
+  type CreditInquiry,
+  type CreditScoreEntry,
+} from '../types'
 import { Card, CardHeader, PageHeader } from '../components/ui/Card'
 import { Button, IconButton } from '../components/ui/Button'
 import { StatTile } from '../components/ui/StatTile'
 import { ProgressBar, RingProgress } from '../components/ui/Progress'
 import { Badge, SeriesDot, StatusBadge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Field, SelectInput, TextInput } from '../components/ui/Field'
+import { Field, SelectInput, Switch, TextInput } from '../components/ui/Field'
 import { ConfirmDialog, Modal } from '../components/ui/Modal'
 import { Segmented } from '../components/ui/Tabs'
 import { useToast } from '../components/ui/Toast'
@@ -120,6 +132,7 @@ export default function Credit() {
 
   const [logOpen, setLogOpen] = useState(false)
   const [inquiryOpen, setInquiryOpen] = useState(false)
+  const [askOpen, setAskOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<DeleteTarget | null>(null)
   const [showAllEvents, setShowAllEvents] = useState(false)
 
@@ -379,6 +392,11 @@ export default function Credit() {
           title="What to do next"
           subtitle="Ordered by how much each one moves the score, using your actual balances and dates"
           icon={<Sparkles className="h-4 w-4" />}
+          action={
+            <Button size="sm" icon={<Bot className="h-4 w-4" />} onClick={() => setAskOpen(true)}>
+              Ask an AI
+            </Button>
+          }
         />
         <ol className="mt-2 flex flex-col divide-y divide-hairline">
           {recommendations.map((rec, index) => (
@@ -415,7 +433,9 @@ export default function Credit() {
         </ol>
         <p className="mt-3 text-[11.5px] leading-relaxed text-muted">
           General guidance based on how Equifax and TransUnion describe their scoring. It is not financial advice
-          and it is not either bureau’s formula — treat the numbers as direction, not prediction.
+          and it is not either bureau’s formula — treat the numbers as direction, not prediction. Want a second
+          opinion? <button type="button" onClick={() => setAskOpen(true)} className="font-medium text-brand hover:underline">Ask an AI</button>{' '}
+          builds a prompt from these numbers that you can paste into any assistant.
         </p>
       </Card>
 
@@ -711,6 +731,7 @@ export default function Credit() {
 
       {logOpen ? <LogScoreModal onClose={() => setLogOpen(false)} onSave={saveScore} /> : null}
       {inquiryOpen ? <AddInquiryModal onClose={() => setInquiryOpen(false)} onSave={saveInquiry} /> : null}
+      {askOpen ? <AskAiModal state={state} onClose={() => setAskOpen(false)} /> : null}
 
       <ConfirmDialog
         open={pendingDelete != null}
@@ -878,6 +899,121 @@ function LogScoreModal({
             />
           )}
         </Field>
+      </div>
+    </Modal>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Ask an AI                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const TEXTAREA_CLASS =
+  'scrollbar-slim min-h-72 w-full resize-y rounded-xl border border-hairline-strong bg-surface-2 px-3 py-2.5 ' +
+  'font-mono text-[12px] leading-relaxed text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25'
+
+/**
+ * A briefing built from the workspace, ready to paste into ChatGPT, Claude,
+ * Gemini or anything else. The text is anonymous by construction — the modal
+ * only chooses how much money context and app opinion to include.
+ */
+function AskAiModal({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const toast = useToast()
+  const [options, setOptions] = useState<PromptOptions>(DEFAULT_PROMPT_OPTIONS)
+  const area = useRef<HTMLTextAreaElement>(null)
+
+  const prompt = useMemo(() => buildCreditPrompt(state, options), [state, options])
+  const stats = promptStats(prompt)
+
+  const toggle = (key: keyof PromptOptions) => (next: boolean) => setOptions((current) => ({ ...current, [key]: next }))
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(prompt)
+      toast.success('Copied — paste it into ChatGPT, Claude, Gemini or any assistant you like.')
+    } catch {
+      // A blocked clipboard or an older browser: select the text and let the
+      // keyboard finish the job.
+      area.current?.select()
+      const copied = typeof document.execCommand === 'function' && document.execCommand('copy')
+      if (copied) toast.success('Copied to the clipboard.')
+      else toast.warn('Could not reach the clipboard — the text is selected, press Ctrl+C or ⌘C.')
+    }
+  }
+
+  function download() {
+    const blob = new Blob([prompt], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${FILE_PREFIX}-credit-prompt-${todayISO()}.txt`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast.success('Prompt saved as a text file.')
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title="Ask an AI about your credit"
+      description="A plain-text briefing built from your numbers. Copy it, paste it into any assistant, and ask away."
+      footer={
+        <>
+          <Button icon={<Download className="h-4 w-4" />} onClick={download}>
+            Download .txt
+          </Button>
+          <Button variant="primary" icon={<Copy className="h-4 w-4" />} onClick={() => void copy()}>
+            Copy prompt
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="rounded-xl border border-hairline bg-surface-2 px-3.5 py-3">
+            <Switch
+              checked={options.includeCashFlow}
+              onChange={toggle('includeCashFlow')}
+              label="Cash-flow context"
+              description="Take-home pay, liquid savings, surplus and fixed commitments — so the advice fits what you can afford."
+            />
+          </div>
+          <div className="rounded-xl border border-hairline bg-surface-2 px-3.5 py-3">
+            <Switch
+              checked={options.includeAppSuggestions}
+              onChange={toggle('includeAppSuggestions')}
+              label="This app’s suggestions"
+              description="Include the list above and ask the assistant to agree, disagree or add to it."
+            />
+          </div>
+          <div className="rounded-xl border border-hairline bg-surface-2 px-3.5 py-3">
+            <Switch
+              checked={options.includeScoreHistory}
+              onChange={toggle('includeScoreHistory')}
+              label="Full score history"
+              description="Every reading, not just the latest — lets the assistant see the shape of the drop."
+            />
+          </div>
+        </div>
+
+        <textarea
+          ref={area}
+          readOnly
+          value={prompt}
+          aria-label="Generated prompt"
+          className={TEXTAREA_CLASS}
+          onFocus={(event) => event.currentTarget.select()}
+        />
+
+        <p className="text-[11.5px] leading-relaxed text-muted">
+          {formatNumber(stats.words)} words · {formatNumber(stats.characters)} characters. The text carries no
+          name, no card numbers and no individual transactions — only the figures a scoring question needs.
+          You can edit it in the box before copying.
+        </p>
       </div>
     </Modal>
   )

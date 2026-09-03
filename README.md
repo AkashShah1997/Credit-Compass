@@ -27,6 +27,23 @@ with it, and a year of Equifax readings that drop from the low 740s to the high
 recommendation lights up straight away. Settings → Data lets you reset to that
 demo, start empty, or export/import a JSON backup.
 
+## Deploying
+
+It is a static site. Push the repository to GitHub and import it in Vercel:
+
+- Framework preset: **Vite** (auto-detected). Build command `npm run build`,
+  output directory `dist`, no environment variables.
+- Routing is hash-based (`/#/cards`), so there are nothing to rewrite — every
+  URL is served by `index.html`.
+- [`vercel.json`](vercel.json) only adds privacy and hardening headers
+  (`Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, and so on).
+- Node 22 is pinned in `package.json` for the build.
+
+Nothing you enter ever leaves the browser: there is no API, no analytics and no
+network call. Local storage is scoped to the origin, so a preview deployment
+has its own empty workspace and cannot see production data — export a JSON
+backup from Settings if you want to carry data across.
+
 ## Credit health — the home page
 
 | Panel | What it does |
@@ -38,6 +55,7 @@ demo, start empty, or export/import a JSON backup.
 | **Five factors** | Payment history, utilization, length of history, credit mix, new credit — weighted the way the bureaus describe them, each with a status and the reason for it |
 | **Hard inquiries** | When each one stops counting (about a year) and when it drops off the report (about three) |
 | **Timeline** | Readings, inquiries and account openings in one list — the story behind the line |
+| **Ask an AI** | Builds an anonymous plain-text briefing from your numbers — scores, accounts, inquiries, cash-flow context, the app's own suggestions — to paste into ChatGPT, Claude, Gemini or any assistant for a second opinion |
 
 Scores are logged by hand. No Canadian bureau exposes a consumer API, so the app
 asks for one reading a month from a free source — Borrowell or the CIBC app for
