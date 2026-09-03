@@ -5,22 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  build: {
-    rollupOptions: {
-      output: {
-        // Split the two heavy, rarely-changing dependency trees into their own
-        // chunks. They then stay cached across app deploys instead of being
-        // re-downloaded every time a page changes.
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
-            return 'charts'
-          }
-          if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
-            return 'react'
-          }
-        },
-      },
-    },
-  },
+  // No manual chunk splitting: pulling recharts and React into separate
+  // vendor chunks previously produced a build where the recharts chunk could
+  // execute before React had finished initializing, crashing the whole app in
+  // production ("Cannot read properties of undefined (reading 'forwardRef')")
+  // while looking fine in dev, where nothing is chunked. Rollup's default
+  // chunking keeps every eagerly-loaded dependency's execution order correct;
+  // per-page code splitting (see the lazy() imports in App.tsx) still does
+  // the real work of keeping the initial bundle small.
 })
