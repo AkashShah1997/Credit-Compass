@@ -1,68 +1,278 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import 'tailwindcss';
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+/* `dark:` utilities key off the explicit attribute we stamp on <html>. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Every color is declared once per theme here, then exposed to Tailwind through
+   `@theme inline` below. `inline` matters: it makes utilities emit
+   `var(--c-surface)` rather than a var that resolves against :root, which is
+   what lets the whole palette swap when [data-theme] changes.
+
+   Chart colors are the validated categorical palette from the data-viz method
+   (8 fixed slots, assigned in order, never cycled). See src/lib/palette.ts.
+--------------------------------------------------------------------------- */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Planes & surfaces */
+  --c-page: #f6f7f9;
+  --c-surface: #ffffff;
+  --c-surface-2: #f2f4f7;
+  --c-surface-3: #e9ecf1;
+  --c-overlay: rgba(11, 15, 25, 0.42);
+
+  /* Ink */
+  --c-text: #0b0f19;
+  --c-text-secondary: #4a5261;
+  --c-muted: #7d8695;
+
+  /* Lines */
+  --c-border: rgba(11, 15, 25, 0.1);
+  --c-border-strong: rgba(11, 15, 25, 0.18);
+  --c-grid: #e8eaee;
+  --c-axis: #c9cdd6;
+
+  /* Brand — the same hue as categorical slot 1 so UI and charts agree */
+  --c-brand: #2a78d6;
+  --c-brand-hover: #256abf;
+  --c-brand-soft: #e8f1fd;
+  --c-brand-ink: #184f95;
+  --c-on-brand: #ffffff;
+
+  /* Status (reserved — never used as a series color) */
+  --c-good: #0ca30c;
+  --c-warning: #fab219;
+  --c-serious: #ec835a;
+  --c-critical: #d03b3b;
+  --c-good-soft: #e6f6e6;
+  --c-warning-soft: #fdf3dd;
+  --c-serious-soft: #fdeee7;
+  --c-critical-soft: #fbe9e9;
+
+  /* Money direction (delta cues — always paired with an arrow or a sign) */
+  --c-positive: #006300;
+  --c-negative: #b3261e;
+
+  --c-ring: rgba(42, 120, 214, 0.4);
+  --shadow-card: 0 1px 2px rgba(11, 15, 25, 0.04), 0 1px 3px rgba(11, 15, 25, 0.06);
+  --shadow-pop: 0 10px 15px -3px rgba(11, 15, 25, 0.1), 0 4px 6px -4px rgba(11, 15, 25, 0.1);
+  --shadow-modal: 0 25px 50px -12px rgba(11, 15, 25, 0.25);
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-page: #0a0c10;
+  --c-surface: #12151c;
+  --c-surface-2: #191d26;
+  --c-surface-3: #222734;
+  --c-overlay: rgba(3, 5, 8, 0.66);
+
+  --c-text: #f5f7fa;
+  --c-text-secondary: #a8b1c1;
+  --c-muted: #78818f;
+
+  --c-border: rgba(255, 255, 255, 0.09);
+  --c-border-strong: rgba(255, 255, 255, 0.18);
+  --c-grid: #222733;
+  --c-axis: #2e3440;
+
+  --c-brand: #3987e5;
+  --c-brand-hover: #5598e7;
+  --c-brand-soft: rgba(57, 135, 229, 0.16);
+  --c-brand-ink: #9ec5f4;
+  --c-on-brand: #ffffff;
+
+  --c-good: #0ca30c;
+  --c-warning: #fab219;
+  --c-serious: #ec835a;
+  --c-critical: #d03b3b;
+  --c-good-soft: rgba(12, 163, 12, 0.16);
+  --c-warning-soft: rgba(250, 178, 25, 0.16);
+  --c-serious-soft: rgba(236, 131, 90, 0.16);
+  --c-critical-soft: rgba(208, 59, 59, 0.18);
+
+  --c-positive: #34c759;
+  --c-negative: #f2837f;
+
+  --c-ring: rgba(57, 135, 229, 0.5);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+@theme inline {
+  --color-page: var(--c-page);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-surface-3: var(--c-surface-3);
+  --color-overlay: var(--c-overlay);
+
+  --color-ink: var(--c-text);
+  --color-ink-secondary: var(--c-text-secondary);
+  --color-muted: var(--c-muted);
+
+  --color-hairline: var(--c-border);
+  --color-hairline-strong: var(--c-border-strong);
+  --color-grid: var(--c-grid);
+  --color-axis: var(--c-axis);
+
+  --color-brand: var(--c-brand);
+  --color-brand-hover: var(--c-brand-hover);
+  --color-brand-soft: var(--c-brand-soft);
+  --color-brand-ink: var(--c-brand-ink);
+  --color-on-brand: var(--c-on-brand);
+
+  --color-good: var(--c-good);
+  --color-warning: var(--c-warning);
+  --color-serious: var(--c-serious);
+  --color-critical: var(--c-critical);
+  --color-good-soft: var(--c-good-soft);
+  --color-warning-soft: var(--c-warning-soft);
+  --color-serious-soft: var(--c-serious-soft);
+  --color-critical-soft: var(--c-critical-soft);
+
+  --color-positive: var(--c-positive);
+  --color-negative: var(--c-negative);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-modal: var(--shadow-modal);
+
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+
+  --radius-card: 1rem;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+@layer base {
+  * {
+    border-color: var(--c-border);
   }
-  a:hover {
-    color: #747bff;
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
-  button {
-    background-color: #f9f9f9;
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--c-page);
+    color: var(--c-text);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Numbers that sit in columns must line up; standalone display figures stay
+     proportional (tabular-nums makes a large "121" look loose). */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--c-brand);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--c-brand-soft);
+    color: var(--c-text);
+  }
+
+  /* Native date/time pickers ship a dark-on-dark icon; invert it in dark mode. */
+  [data-theme='dark'] input::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.6);
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-border-strong) transparent;
+  }
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: var(--c-border-strong);
+    border-radius: 9999px;
+  }
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes mf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mf-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes mf-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: mf-fade-in 0.18s ease-out both;
+}
+.animate-pop-in {
+  animation: mf-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-slide-in {
+  animation: mf-slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
   }
 }

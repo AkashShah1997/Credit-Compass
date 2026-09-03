@@ -20,4 +20,27 @@ export default tseslint.config([
       globals: globals.browser,
     },
   },
+  {
+    // Context providers ship next to the hook that reads them — splitting the
+    // two across files to satisfy Fast Refresh would make the API worse for a
+    // dev-only concern. Whitelist the hooks instead of silencing the rule.
+    files: ['src/store/*.tsx', 'src/components/ui/Toast.tsx', 'src/components/layout/AppShell.tsx'],
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            'useAppState',
+            'useActions',
+            'useSelector',
+            'useTheme',
+            'useChartMode',
+            'useToast',
+            'useQuickAdd',
+          ],
+        },
+      ],
+    },
+  },
 ])
