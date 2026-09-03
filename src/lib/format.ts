@@ -102,6 +102,15 @@ export function formatTenure(months: number): string {
   return rest ? `${years} yr${years > 1 ? 's' : ''} ${rest} mo` : `${years} yr${years > 1 ? 's' : ''}`
 }
 
+/** `1` → `1st`, `22` → `22nd`, `13` → `13th`. */
+export function ordinal(n: number): string {
+  const day = Math.round(n)
+  const teen = day % 100
+  if (teen >= 11 && teen <= 13) return `${day}th`
+  const last = day % 10
+  return `${day}${last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th'}`
+}
+
 /** `•••• 4821` masked card display. */
 export function maskCard(last4: string): string {
   return `•••• ${last4}`

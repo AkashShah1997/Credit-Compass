@@ -215,7 +215,7 @@ export default function Dashboard() {
         <ChartFrame
           className="lg:col-span-7"
           title="Income vs expenses"
-          subtitle="Last six months, with the net line on the same rupee scale"
+          subtitle="Last six months, with the net line on the same dollar scale"
           height={272}
           legend={[
             { label: 'Income', color: flow.income },

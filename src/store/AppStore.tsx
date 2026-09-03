@@ -22,6 +22,8 @@ import type {
   Asset,
   BudgetLimits,
   CreditCard,
+  CreditInquiry,
+  CreditScoreEntry,
   ExpenseCategory,
   Investment,
   Liability,
@@ -71,6 +73,11 @@ type Action =
   | { type: 'liability/add'; liability: Liability }
   | { type: 'liability/update'; id: string; patch: Partial<Liability> }
   | { type: 'liability/remove'; id: string }
+  | { type: 'score/add'; entry: CreditScoreEntry }
+  | { type: 'score/update'; id: string; patch: Partial<CreditScoreEntry> }
+  | { type: 'score/remove'; id: string }
+  | { type: 'inquiry/add'; inquiry: CreditInquiry }
+  | { type: 'inquiry/remove'; id: string }
   | { type: 'alert/dismiss'; id: string }
   | { type: 'alert/restoreAll' }
   | { type: 'system/replace'; state: AppState }
@@ -264,6 +271,21 @@ function reducer(state: AppState, action: Action): AppState {
     case 'liability/remove':
       return { ...state, liabilities: state.liabilities.filter((l) => l.id !== action.id) }
 
+    case 'score/add':
+      return { ...state, creditScores: [...state.creditScores, action.entry] }
+
+    case 'score/update':
+      return { ...state, creditScores: patchById(state.creditScores, action.id, action.patch) }
+
+    case 'score/remove':
+      return { ...state, creditScores: state.creditScores.filter((s) => s.id !== action.id) }
+
+    case 'inquiry/add':
+      return { ...state, inquiries: [...state.inquiries, action.inquiry] }
+
+    case 'inquiry/remove':
+      return { ...state, inquiries: state.inquiries.filter((i) => i.id !== action.id) }
+
     case 'alert/dismiss':
       return state.dismissedAlerts.includes(action.id)
         ? state
@@ -319,6 +341,12 @@ export interface AppActions {
   addLiability: (input: Omit<Liability, 'id' | 'updatedAt'>) => void
   updateLiability: (id: string, patch: Partial<Liability>) => void
   removeLiability: (id: string) => void
+
+  addScore: (input: Omit<CreditScoreEntry, 'id'>) => void
+  updateScore: (id: string, patch: Partial<CreditScoreEntry>) => void
+  removeScore: (id: string) => void
+  addInquiry: (input: Omit<CreditInquiry, 'id'>) => void
+  removeInquiry: (id: string) => void
 
   dismissAlert: (id: string) => void
   restoreAlerts: () => void
@@ -432,6 +460,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updateLiability: (id, patch) =>
         dispatch({ type: 'liability/update', id, patch: { ...patch, updatedAt: todayISO() } }),
       removeLiability: (id) => dispatch({ type: 'liability/remove', id }),
+
+      addScore: (input) => dispatch({ type: 'score/add', entry: { ...input, id: uid('score') } }),
+      updateScore: (id, patch) => dispatch({ type: 'score/update', id, patch }),
+      removeScore: (id) => dispatch({ type: 'score/remove', id }),
+      addInquiry: (input) => dispatch({ type: 'inquiry/add', inquiry: { ...input, id: uid('inq') } }),
+      removeInquiry: (id) => dispatch({ type: 'inquiry/remove', id }),
 
       dismissAlert: (id) => dispatch({ type: 'alert/dismiss', id }),
       restoreAlerts: () => dispatch({ type: 'alert/restoreAll' }),

@@ -50,7 +50,8 @@ import {
 import { useActions, useAppState } from '../store/AppStore'
 import { useTheme } from '../store/ThemeProvider'
 import type { AppState, ThemePreference } from '../types'
-import { averageMonthlyExpense, buildNotifications, defaultSettings, fiStatus } from '../lib/finance'
+import { averageMonthlyExpense, defaultSettings, fiStatus } from '../lib/finance'
+import { buildAllNotifications } from '../lib/credit'
 import { monthRange, todayISO } from '../lib/date'
 import { formatCurrency, formatNumber, formatPercent } from '../lib/format'
 import { series } from '../lib/palette'
@@ -548,7 +549,7 @@ function AlertsCard() {
   // being suppressed. Stale ids (a bill since paid) correctly drop out.
   const hiddenNow = useMemo(() => {
     const dismissed = new Set(state.dismissedAlerts)
-    return buildNotifications({ ...state, dismissedAlerts: [] }).filter((n) => dismissed.has(n.id)).length
+    return buildAllNotifications({ ...state, dismissedAlerts: [] }).filter((n) => dismissed.has(n.id)).length
   }, [state])
 
   const remembered = state.dismissedAlerts.length
@@ -1002,6 +1003,8 @@ function toAppState(raw: unknown): AppState | null {
     cards: asArray(input.cards),
     assets: asArray(input.assets),
     liabilities: asArray(input.liabilities),
+    creditScores: asArray(input.creditScores),
+    inquiries: asArray(input.inquiries),
     dismissedAlerts: asArray(input.dismissedAlerts),
   }
 }

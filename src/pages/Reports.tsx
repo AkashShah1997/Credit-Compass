@@ -874,7 +874,7 @@ function YearlyReport({
 
       <ChartFrame
         title={`Month by month, ${year}`}
-        subtitle="Income and expense columns with the net line on the same rupee scale"
+        subtitle="Income and expense columns with the net line on the same dollar scale"
         height={288}
         legend={[
           { label: 'Income', color: flow.income },

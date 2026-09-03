@@ -62,7 +62,7 @@ export function TextInput({ className, invalid, leading, ...props }: TextInputPr
   )
 }
 
-/** Amount input: numeric keypad on mobile, rupee mark in the gutter. */
+/** Amount input: numeric keypad on mobile, dollar sign in the gutter. */
 export function CurrencyInput({ className, invalid, ...props }: TextInputProps) {
   return (
     <TextInput

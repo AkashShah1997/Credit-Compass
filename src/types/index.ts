@@ -203,22 +203,66 @@ export interface Loan {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Credit cards                                                               */
+/* Credit cards & lines of credit                                             */
 /* -------------------------------------------------------------------------- */
+
+/** Both are revolving credit, and both count toward utilization. */
+export const CREDIT_ACCOUNT_KINDS = ['Credit Card', 'Line of Credit'] as const
+export type CreditAccountKind = (typeof CREDIT_ACCOUNT_KINDS)[number]
 
 export interface CreditCard {
   id: string
   name: string
   issuer: string
   last4: string
+  /** Defaults to a credit card when absent (older saves). */
+  kind?: CreditAccountKind
   creditLimit: number
-  /** Amount owed on the current statement. */
+  /** Amount owed on the current statement — what the bureaus see. */
   outstanding: number
   minimumDue: number
+  /** Annual interest rate on carried balances, percent. */
+  apr?: number
   statementDay: number
   billDueDay: number
+  /** When the account was opened; feeds the length-of-history factor. */
+  openedDate?: string
   /** `YYYY-MM` of the last cycle the user marked as paid. */
   lastPaidMonth?: string
+}
+
+/* -------------------------------------------------------------------------- */
+/* Credit score & inquiries                                                   */
+/* -------------------------------------------------------------------------- */
+
+export const CREDIT_BUREAUS = ['Equifax', 'TransUnion'] as const
+export type CreditBureau = (typeof CREDIT_BUREAUS)[number]
+
+/** Where a free reading usually comes from in Canada. Free text is accepted too. */
+export const SCORE_SOURCES = ['Borrowell', 'Credit Karma', 'CIBC', 'Mogo', 'Bank app', 'Bureau report', 'Other'] as const
+
+/**
+ * A score reading, logged by hand. No Canadian bureau exposes a consumer API,
+ * so one entry a month from a free provider is the honest way to track it.
+ */
+export interface CreditScoreEntry {
+  id: string
+  date: string
+  /** 300–900 on the Canadian scale. */
+  score: number
+  bureau: CreditBureau
+  source?: string
+  note?: string
+}
+
+/** A hard pull on the file — an application for credit. */
+export interface CreditInquiry {
+  id: string
+  date: string
+  lender: string
+  /** What was applied for — shown on the timeline. */
+  purpose: string
+  bureau?: CreditBureau | 'Both'
 }
 
 /* -------------------------------------------------------------------------- */
@@ -284,6 +328,8 @@ export interface Settings {
   safeWithdrawalRate: number
   /** Monthly spend the FI corpus must cover; blank means "use actual spend". */
   fiMonthlyExpenses: number
+  /** The score being worked toward. 760+ is "excellent" at both Canadian bureaus. */
+  creditScoreGoal: number
   theme: ThemePreference
 }
 
@@ -292,7 +338,7 @@ export interface Settings {
 /* -------------------------------------------------------------------------- */
 
 export type NotificationSeverity = 'info' | 'warning' | 'serious' | 'critical'
-export type NotificationKind = 'loan' | 'card' | 'budget' | 'goal' | 'salary' | 'investment'
+export type NotificationKind = 'loan' | 'card' | 'budget' | 'goal' | 'salary' | 'investment' | 'credit'
 
 export interface AppNotification {
   /** Stable across renders so dismissals persist — kind + entity + period. */
@@ -323,6 +369,8 @@ export interface AppState {
   cards: CreditCard[]
   assets: Asset[]
   liabilities: Liability[]
+  creditScores: CreditScoreEntry[]
+  inquiries: CreditInquiry[]
   /** Notification ids the user has dismissed. */
   dismissedAlerts: string[]
 }

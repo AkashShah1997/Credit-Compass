@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, CalendarClock, CreditCard, Info, OctagonAlert, PiggyBank, Target, Wallet } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, CalendarClock, CreditCard, Gauge, Info, OctagonAlert, PiggyBank, Target, Wallet } from 'lucide-react'
 import type { AppNotification, NotificationKind, NotificationSeverity } from '../../types'
 import { useActions, useAppState } from '../../store/AppStore'
-import { buildNotifications } from '../../lib/finance'
+import { buildAllNotifications } from '../../lib/credit'
 import { formatCurrency } from '../../lib/format'
 import { formatDate } from '../../lib/date'
 import { useDismiss } from '../../hooks/useClickOutside'
@@ -16,6 +16,7 @@ const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   goal: PiggyBank,
   salary: Target,
   investment: Target,
+  credit: Gauge,
 }
 
 const SEVERITY_STYLE: Record<NotificationSeverity, { icon: typeof Info; className: string; label: string }> = {
@@ -32,7 +33,7 @@ export function NotificationCenter() {
   const container = useRef<HTMLDivElement>(null)
   useDismiss(container, open, () => setOpen(false))
 
-  const notifications = useMemo(() => buildNotifications(state), [state])
+  const notifications = useMemo(() => buildAllNotifications(state), [state])
   const urgent = notifications.filter((n) => n.severity === 'critical' || n.severity === 'serious').length
 
   return (

@@ -265,7 +265,7 @@ function SalaryDay() {
             label="Commitment ratio"
             value={formatPercent(commitmentRatio, 0)}
             upIsGood={false}
-            sub="Share of the pay-cheque owed before you spend a rupee"
+            sub="Share of the paycheque owed before you spend a dollar"
             icon={<Gauge className="h-4 w-4" />}
             accent={flow.expense}
           />
@@ -510,7 +510,7 @@ function CashFlow() {
       ) : null}
 
       {/* Income is an inflow and the rest are outflows, so they are never stacked
-          together — two columns on one rupee axis, with the balance as a line. */}
+          together — two columns on one dollar axis, with the balance as a line. */}
       <ChartFrame
         title="Money in against money out"
         subtitle={`Next ${horizon} months at today's commitments`}
@@ -622,7 +622,7 @@ interface ScenarioInputs {
 /**
  * Re-derives the FI picture from what-if inputs using exactly the arithmetic in
  * `fiStatus`, so an untouched scenario reproduces the stored numbers to the
- * rupee. The corpus itself is never a what-if: it is money you actually have.
+ * dollar. The corpus itself is never a what-if: it is money you actually have.
  */
 function deriveFi(base: FiStatus, safeWithdrawalRate: number, input: ScenarioInputs): FiStatus {
   const annualExpenses = input.monthlyExpenses * 12
@@ -950,7 +950,7 @@ function Independence() {
             />
           ) : undefined
         }
-        footnote={`Compounded monthly on today's corpus of ${formatCompactCurrency(corpus)}, adding ${formatCurrency(scenario.monthlyInvestment)} every month at ${formatPercent(scenario.returnRate)} a year. Steady returns are an assumption, not a promise, and inflation of ${formatPercent(state.settings.inflationRate)} is not deducted — the FI number is priced in today's rupees.`}
+        footnote={`Compounded monthly on today's corpus of ${formatCompactCurrency(corpus)}, adding ${formatCurrency(scenario.monthlyInvestment)} every month at ${formatPercent(scenario.returnRate)} a year. Steady returns are an assumption, not a promise, and inflation of ${formatPercent(state.settings.inflationRate)} is not deducted — the FI number is priced in today's dollars.`}
       >
         <TrendChart
           data={projection.map((point) => ({

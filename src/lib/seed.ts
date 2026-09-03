@@ -17,6 +17,8 @@ import type {
   Asset,
   BudgetsByMonth,
   CreditCard,
+  CreditInquiry,
+  CreditScoreEntry,
   GoalContribution,
   Investment,
   InvestmentSnapshot,
@@ -304,11 +306,14 @@ export function buildSeedState(): AppState {
       name: 'CIBC Dividend Visa',
       issuer: 'CIBC',
       last4: '4821',
+      kind: 'Credit Card',
       creditLimit: 8000,
       outstanding: 4880,
       minimumDue: 120,
+      apr: 20.99,
       statementDay: 25,
       billDueDay: 18,
+      openedDate: `${addMonths(thisMonth, -62)}-10`,
     },
   ]
 
@@ -320,6 +325,42 @@ export function buildSeedState(): AppState {
   ]
 
   const liabilities: Liability[] = []
+
+  /* ---------------------------------------------------------------------- */
+  /* Credit score history & inquiries                                        */
+  /* ---------------------------------------------------------------------- */
+
+  // Steady in the low 740s, a two-step drop once the auto loan and its inquiry
+  // reached the file, then flat in the high 660s — the pattern this app exists
+  // to explain. Bureau updates lag the event, so the first reading after the
+  // loan is still the old number.
+  const creditScores: CreditScoreEntry[] = []
+  months.forEach((month, i) => {
+    const monthsAgo = months.length - 1 - i
+    const equifax =
+      monthsAgo >= DEMO_AUTO_LOAN_MONTHS_AGO
+        ? 738 + between(0, 5)
+        : monthsAgo === DEMO_AUTO_LOAN_MONTHS_AGO - 1
+          ? 712
+          : monthsAgo === DEMO_AUTO_LOAN_MONTHS_AGO - 2
+            ? 678
+            : 668 + between(0, 8)
+    const date = clampDayToMonth(month, 6)
+    if (date <= today) {
+      creditScores.push({ id: uid('score'), date, score: equifax, bureau: 'Equifax', source: 'Borrowell' })
+    }
+    // TransUnion runs its own model — a quarterly reading, a few points apart.
+    if (i % 3 === 0) {
+      const tuDate = clampDayToMonth(month, 20)
+      if (tuDate <= today) {
+        creditScores.push({ id: uid('score'), date: tuDate, score: equifax + between(-9, 4), bureau: 'TransUnion', source: 'Credit Karma' })
+      }
+    }
+  })
+
+  const inquiries: CreditInquiry[] = [
+    { id: 'inq_auto', date: `${autoStart}-12`, lender: 'CIBC', purpose: 'Auto loan application', bureau: 'Equifax' },
+  ]
 
   /* ---------------------------------------------------------------------- */
   /* Budgets                                                                 */
@@ -350,6 +391,8 @@ export function buildSeedState(): AppState {
     cards,
     assets,
     liabilities,
+    creditScores,
+    inquiries,
     dismissedAlerts: [],
   }
 }
@@ -373,6 +416,8 @@ export function buildEmptyState(): AppState {
     cards: [],
     assets: [],
     liabilities: [],
+    creditScores: [],
+    inquiries: [],
     dismissedAlerts: [],
   }
 }

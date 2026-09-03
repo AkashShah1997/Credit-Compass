@@ -1035,6 +1035,8 @@ export function defaultSettings(): Settings {
     inflationRate: 3,
     safeWithdrawalRate: 4,
     fiMonthlyExpenses: 0,
+    // The bottom of Equifax Canada's "excellent" band — where the best rates start.
+    creditScoreGoal: 760,
     theme: 'system',
   }
 }

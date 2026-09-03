@@ -59,6 +59,8 @@ export function migrate(raw: unknown): AppState | null {
     cards: Array.isArray(input.cards) ? input.cards : [],
     assets: Array.isArray(input.assets) ? input.assets : [],
     liabilities: Array.isArray(input.liabilities) ? input.liabilities : [],
+    creditScores: Array.isArray(input.creditScores) ? input.creditScores : [],
+    inquiries: Array.isArray(input.inquiries) ? input.inquiries : [],
     dismissedAlerts: Array.isArray(input.dismissedAlerts) ? input.dismissedAlerts : [],
   }
 

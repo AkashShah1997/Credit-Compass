@@ -94,6 +94,20 @@ export function addDays(iso: string, delta: number): string {
   return toISO(date)
 }
 
+/** The same calendar day `delta` months away, clamped to the target month's length. */
+export function addMonthsToDate(iso: string, delta: number): string {
+  return clampDayToMonth(addMonths(monthKey(iso), delta), parseISO(iso).getDate())
+}
+
+/** Whole months elapsed from `iso` to `today`; never negative. */
+export function monthsSince(iso: string, today: string = todayISO()): number {
+  const from = parseISO(iso)
+  const to = parseISO(today)
+  let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth())
+  if (to.getDate() < from.getDate()) months -= 1
+  return Math.max(0, months)
+}
+
 export function daysInMonth(key: string): number {
   const [y, m] = key.split('-').map(Number)
   return new Date(y, m, 0).getDate()

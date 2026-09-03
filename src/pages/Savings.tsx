@@ -391,7 +391,7 @@ export default function Savings() {
           <EmptyState
             icon={<Target className="h-5 w-5" />}
             title="No savings goals yet"
-            message="Name what you are saving for, set a target, and every rupee you put aside will be tracked against it."
+            message="Name what you are saving for, set a target, and every dollar you put aside will be tracked against it."
             action={
               <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => openCreate()}>
                 Create your first goal

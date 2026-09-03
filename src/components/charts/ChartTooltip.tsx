@@ -16,7 +16,7 @@ export interface ChartTooltipProps {
   active?: boolean
   payload?: readonly TooltipItem[]
   label?: unknown
-  /** Overrides the default rupee formatting. */
+  /** Overrides the default currency formatting. */
   format?: (value: number) => string
   /** Optional line under the rows, e.g. a total or a share. */
   renderFooter?: (payload: readonly TooltipItem[]) => React.ReactNode
