@@ -48,6 +48,7 @@ backup from Settings if you want to carry data across.
 
 | Panel | What it does |
 |---|---|
+| **Monthly check-in** | The whole routine on one screen, thirty seconds a month: the score you just saw, the new statement balance on each card, and whether the loan payment went through. Everything else is entered once — there is nothing to import |
 | **Score** | Latest reading with its Equifax band (Poor → Excellent), a ring toward your goal, the change since your last reading and since your newest account, points to the next band |
 | **What to do next** | An ordered list of concrete actions built from *your* balances and dates — e.g. "Pay $2,481 on CIBC Dividend Visa before the 25th — reported utilization 61% → under 30%". Each carries an impact rating and a timing |
 | **Score history** | One line per bureau (they are never compared to each other), your goal as a reference line, and vertical markers where a loan was opened or a lender pulled your file |
@@ -60,7 +61,9 @@ backup from Settings if you want to carry data across.
 Scores are logged by hand. No Canadian bureau exposes a consumer API, so the app
 asks for one reading a month from a free source — Borrowell or the CIBC app for
 Equifax, Credit Karma for TransUnion — and works everything else out from the
-accounts you have entered. The engine encodes the publicly documented way
+accounts you have entered. Only three things change month to month (the score,
+each card's statement balance, the loan payment), and the check-in asks for
+exactly those. The engine encodes the publicly documented way
 Canadian scores are weighed; it is general guidance, not either bureau's
 formula, and the page says so.
 

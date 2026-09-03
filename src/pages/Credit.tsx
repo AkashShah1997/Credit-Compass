@@ -13,6 +13,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Bot,
+  CalendarCheck,
   CalendarClock,
   Clock,
   Copy,
@@ -34,7 +35,9 @@ import {
   UTILISATION_IDEAL,
   changeSinceDate,
   creditOverview,
+  paymentHistory,
   scoreByMonth,
+  scoreTrend,
   signedPoints,
   type CreditEvent,
   type CreditFactor,
@@ -42,8 +45,8 @@ import {
   type Impact,
   type Timing,
 } from '../lib/credit'
-import { formatDate, formatDateShort, monthKey, monthRange, monthShort, todayISO } from '../lib/date'
-import { formatCurrency, formatNumber, formatPercent, formatTenure } from '../lib/format'
+import { formatDate, formatDateShort, monthKey, monthRange, monthShort, nextDueDate, todayISO } from '../lib/date'
+import { formatCurrency, formatNumber, formatPercent, formatTenure, ordinal } from '../lib/format'
 import { FLOW_COLORS, seriesColor } from '../lib/palette'
 import { FILE_PREFIX } from '../lib/brand'
 import { DEFAULT_PROMPT_OPTIONS, buildCreditPrompt, promptStats, type PromptOptions } from '../lib/prompt'
@@ -61,7 +64,7 @@ import { StatTile } from '../components/ui/StatTile'
 import { ProgressBar, RingProgress } from '../components/ui/Progress'
 import { Badge, SeriesDot, StatusBadge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Field, SelectInput, Switch, TextInput } from '../components/ui/Field'
+import { CurrencyInput, Field, SelectInput, Switch, TextInput } from '../components/ui/Field'
 import { ConfirmDialog, Modal } from '../components/ui/Modal'
 import { Segmented } from '../components/ui/Tabs'
 import { useToast } from '../components/ui/Toast'
@@ -130,6 +133,7 @@ export default function Credit() {
   const goal = state.settings.creditScoreGoal
   const latest = trend.latest
 
+  const [checkInOpen, setCheckInOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
   const [inquiryOpen, setInquiryOpen] = useState(false)
   const [askOpen, setAskOpen] = useState(false)
@@ -220,8 +224,8 @@ export default function Credit() {
             <Button icon={<Search className="h-4 w-4" />} onClick={() => setInquiryOpen(true)}>
               Add inquiry
             </Button>
-            <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setLogOpen(true)}>
-              Log score
+            <Button variant="primary" icon={<CalendarCheck className="h-4 w-4" />} onClick={() => setCheckInOpen(true)}>
+              Monthly check-in
             </Button>
           </>
         }
@@ -729,6 +733,7 @@ export default function Credit() {
         </Card>
       </div>
 
+      {checkInOpen ? <CheckInModal state={state} onClose={() => setCheckInOpen(false)} /> : null}
       {logOpen ? <LogScoreModal onClose={() => setLogOpen(false)} onSave={saveScore} /> : null}
       {inquiryOpen ? <AddInquiryModal onClose={() => setInquiryOpen(false)} onSave={saveInquiry} /> : null}
       {askOpen ? <AskAiModal state={state} onClose={() => setAskOpen(false)} /> : null}
@@ -775,6 +780,203 @@ function FactorCard({ factor }: { factor: CreditFactor }) {
         </a>
       ) : null}
     </Card>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Monthly check-in                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The whole monthly routine on one screen: the score you just saw, the new
+ * statement balance on each card, and whether the loan payment went through.
+ * Everything else on the file — limits, opened dates, loan terms, inquiries —
+ * is entered once and left alone, so there is nothing to import.
+ */
+function CheckInModal({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const actions = useActions()
+  const toast = useToast()
+  const today = todayISO()
+  const trend = useMemo(() => scoreTrend(state.creditScores, today), [state.creditScores, today])
+  const payments = useMemo(() => paymentHistory(state, today), [state, today])
+
+  const [bureau, setBureau] = useState<CreditBureau>(trend.latest?.bureau ?? 'Equifax')
+  const [score, setScore] = useState('')
+  const [balances, setBalances] = useState<Record<string, string>>(() =>
+    Object.fromEntries(state.cards.map((card) => [card.id, String(card.outstanding)])),
+  )
+  // Loans with a due date passed since the last recorded payment default to
+  // "record it" — a missed payment is the exception, so it is the opt-out.
+  const [record, setRecord] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(payments.loansBehind.map(({ loan }) => [loan.id, true])),
+  )
+  const [submitted, setSubmitted] = useState(false)
+
+  const scoreValue = Number(score)
+  const scoreError =
+    score.trim() === ''
+      ? undefined
+      : !Number.isFinite(scoreValue) || scoreValue < 300 || scoreValue > 900
+        ? 'Canadian scores run from 300 to 900.'
+        : undefined
+  const balanceErrors: Record<string, string | undefined> = Object.fromEntries(
+    state.cards.map((card) => {
+      const raw = balances[card.id] ?? ''
+      const value = Number(raw)
+      return [
+        card.id,
+        raw.trim() === '' || !Number.isFinite(value) || value < 0 ? 'Enter the statement balance — 0 if it is clear.' : undefined,
+      ]
+    }),
+  )
+  const hasErrors = Boolean(scoreError) || Object.values(balanceErrors).some(Boolean)
+
+  const openLoans = state.loans.filter((loan) => loan.active && loan.paidMonths < loan.tenureMonths)
+  const behindById = new Map(payments.loansBehind.map(({ loan, missed }) => [loan.id, missed]))
+  const lastReading = trend.byBureau[bureau]
+
+  function save() {
+    setSubmitted(true)
+    if (hasErrors) return
+    const done: string[] = []
+
+    if (score.trim()) {
+      const rounded = Math.round(scoreValue)
+      actions.addScore({ date: today, score: rounded, bureau, source: lastReading?.source })
+      done.push(`${bureau} ${rounded} logged`)
+    }
+
+    let cardsChanged = 0
+    for (const card of state.cards) {
+      const next = Math.round(Number(balances[card.id]) * 100) / 100
+      if (next === card.outstanding) continue
+      // A fresh statement balance means this cycle is no longer "paid" — the
+      // utilization and the bill calendar should both see the new figure.
+      actions.updateCard(card.id, {
+        outstanding: next,
+        lastPaidMonth: next > 0 && card.lastPaidMonth === monthKey(today) ? undefined : card.lastPaidMonth,
+      })
+      cardsChanged += 1
+    }
+    if (cardsChanged) done.push(`${cardsChanged} card balance${cardsChanged === 1 ? '' : 's'} updated`)
+
+    let recorded = 0
+    for (const { loan, missed } of payments.loansBehind) {
+      if (!record[loan.id]) continue
+      for (let i = 0; i < missed; i += 1) actions.recordLoanPayment(loan.id)
+      recorded += missed
+    }
+    if (recorded) done.push(`${recorded} loan payment${recorded === 1 ? '' : 's'} recorded`)
+
+    toast.success(done.length ? `Check-in saved — ${done.join(', ')}.` : 'Nothing changed — you are up to date.')
+    onClose()
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Monthly check-in"
+      description="Thirty seconds, once a month. Leave anything you have not checked as it is."
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={save}>
+            Save check-in
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <section className="flex flex-col gap-3">
+          <h3 className="text-[13px] font-semibold text-ink">1 · Score</h3>
+          <Segmented
+            size="sm"
+            ariaLabel="Credit bureau"
+            value={bureau}
+            onChange={setBureau}
+            options={CREDIT_BUREAUS.map((option) => ({ value: option, label: option }))}
+          />
+          <Field
+            label={`${bureau} score`}
+            error={submitted ? scoreError : undefined}
+            hint={
+              lastReading
+                ? `Last ${bureau} reading ${lastReading.score} on ${formatDate(lastReading.date)}${lastReading.source ? ` via ${lastReading.source}` : ''}. Leave blank if you have not checked it.`
+                : 'Borrowell and the CIBC app show Equifax; Credit Karma shows TransUnion. Leave blank if you have not checked it.'
+            }
+          >
+            {(id) => (
+              <TextInput
+                id={id}
+                autoFocus
+                type="number"
+                inputMode="numeric"
+                min={300}
+                max={900}
+                className="tabular"
+                value={score}
+                placeholder={lastReading ? String(lastReading.score) : '700'}
+                invalid={submitted && scoreError != null}
+                onChange={(event) => setScore(event.target.value)}
+              />
+            )}
+          </Field>
+        </section>
+
+        {state.cards.length ? (
+          <section className="flex flex-col gap-3">
+            <h3 className="text-[13px] font-semibold text-ink">2 · Statement balances</h3>
+            {state.cards.map((card) => (
+              <Field
+                key={card.id}
+                label={card.name}
+                error={submitted ? balanceErrors[card.id] : undefined}
+                hint={`Limit ${formatCurrency(card.creditLimit)} · was ${formatCurrency(card.outstanding)} · statement closes on the ${ordinal(card.statementDay)}`}
+              >
+                {(id) => (
+                  <CurrencyInput
+                    id={id}
+                    value={balances[card.id] ?? ''}
+                    invalid={submitted && balanceErrors[card.id] != null}
+                    onChange={(event) => setBalances((current) => ({ ...current, [card.id]: event.target.value }))}
+                  />
+                )}
+              </Field>
+            ))}
+          </section>
+        ) : null}
+
+        {openLoans.length ? (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-[13px] font-semibold text-ink">3 · Loan payments</h3>
+            {openLoans.map((loan) => {
+              const missed = behindById.get(loan.id) ?? 0
+              return missed > 0 ? (
+                <div key={loan.id} className="rounded-xl border border-hairline bg-surface-2 px-3.5 py-3">
+                  <Switch
+                    checked={record[loan.id] ?? false}
+                    onChange={(next) => setRecord((current) => ({ ...current, [loan.id]: next }))}
+                    label={`${loan.name}: record ${missed === 1 ? 'the' : missed} payment${missed === 1 ? '' : 's'} of ${formatCurrency(loan.paymentAmount)}`}
+                    description={`${missed === 1 ? 'A due date has' : `${missed} due dates have`} passed since the last recorded payment. Turn this off only if a payment was actually missed.`}
+                  />
+                </div>
+              ) : (
+                <p
+                  key={loan.id}
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-hairline px-3.5 py-3 text-[13px] text-ink-secondary"
+                >
+                  <StatusBadge status="good">Up to date</StatusBadge>
+                  <span>
+                    {loan.name} · next payment {formatDate(nextDueDate(loan.dueDay, today))}
+                  </span>
+                </p>
+              )
+            })}
+          </section>
+        ) : null}
+      </div>
+    </Modal>
   )
 }
 

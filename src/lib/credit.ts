@@ -771,8 +771,8 @@ export function creditRecommendations(state: AppState, today = todayISO()): Reco
       id: 'score:log',
       impact: 'low',
       timing: 'now',
-      title: trend.latest ? `Log a fresh score — your last reading is ${trend.daysSinceLatest} days old` : 'Log your first credit score',
-      detail: 'Borrowell shows your Equifax score free, Credit Karma shows TransUnion, and the CIBC app shows Equifax as well. One reading a month is enough to see the trend — the advice above works off your accounts, not the number.',
+      title: trend.latest ? `Do your monthly check-in — last reading is ${trend.daysSinceLatest} days old` : 'Log your first credit score',
+      detail: 'Thirty seconds: the score from Borrowell, Credit Karma or your bank app, the new statement balance on each card, and whether the loan payment went through. That is all the app needs each month — everything else on the file is entered once.',
       href: '#/',
     })
   }
@@ -898,8 +898,10 @@ export function creditNotifications(state: AppState, today = todayISO()): AppNot
       id: `credit:log:${monthKey(today)}`,
       kind: 'credit',
       severity: 'info',
-      title: trend.latest ? 'Log this month’s credit score' : 'Log your first credit score',
-      detail: trend.latest ? `Last reading ${trend.daysSinceLatest} days ago` : 'Borrowell, Credit Karma and the CIBC app are all free',
+      title: trend.latest ? 'Time for your monthly check-in' : 'Log your first credit score',
+      detail: trend.latest
+        ? `Last reading ${trend.daysSinceLatest} days ago — score, card balances, loan payment`
+        : 'Borrowell, Credit Karma and the CIBC app are all free',
       href: '#/',
     })
   }
