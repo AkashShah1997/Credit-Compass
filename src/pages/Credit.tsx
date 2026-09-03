@@ -32,6 +32,7 @@ import {
   changeSinceDate,
   creditOverview,
   scoreByMonth,
+  signedPoints,
   type CreditEvent,
   type CreditFactor,
   type FactorStatus,
@@ -253,7 +254,7 @@ export default function Credit() {
                 )}
               </div>
               {latest && band ? (
-                <RingProgress value={goalProgress} size={108} thickness={9} tone={band.tone}>
+                <RingProgress value={goalProgress} size={108} thickness={9} tone={band.tone === 'info' ? 'brand' : band.tone}>
                   <span className="text-[17px] leading-none font-semibold tracking-[-0.02em] text-ink">
                     {Math.round(goalProgress)}%
                   </span>
@@ -271,14 +272,12 @@ export default function Credit() {
                       tone={trend.changeSincePrevious > 0 ? 'good' : trend.changeSincePrevious < 0 ? 'critical' : 'neutral'}
                       icon={<ChangeIcon className="h-3 w-3" />}
                     >
-                      {trend.changeSincePrevious > 0 ? '+' : ''}
-                      {trend.changeSincePrevious} since last reading
+                      {signedPoints(trend.changeSincePrevious)} since last reading
                     </Badge>
                   ) : null}
                   {sinceNewest && newest ? (
                     <Badge tone="neutral">
-                      {sinceNewest.change > 0 ? '+' : ''}
-                      {sinceNewest.change} since {newest.label.toLowerCase()}
+                      {signedPoints(sinceNewest.change)} since {newest.label.toLowerCase()}
                     </Badge>
                   ) : null}
                 </div>
@@ -288,7 +287,7 @@ export default function Credit() {
                     : 'Top band — there is nothing above this. '}
                   {latest.score < goal ? `${goal - latest.score} to your ${goal} goal.` : 'Goal reached.'}
                   {trend.changeSincePeak != null && trend.changeSincePeak < 0 && trend.peak
-                    ? ` Peak was ${trend.peak.score} in ${formatDateShort(trend.peak.date)}.`
+                    ? ` Peak was ${trend.peak.score} on ${formatDate(trend.peak.date)}.`
                     : ''}
                 </p>
               </>

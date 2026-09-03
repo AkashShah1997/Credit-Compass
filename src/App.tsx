@@ -7,6 +7,7 @@ import { AppShell } from './components/layout/AppShell'
 import { useRouter } from './hooks/useRouter'
 import { Button } from './components/ui/Button'
 import { EmptyState } from './components/ui/EmptyState'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 
 // Credit health is the landing route, so it ships in the main bundle. Every
 // other page is fetched on first visit — the chunk lands well inside the
@@ -87,9 +88,12 @@ function Routes() {
 
   return (
     <AppShell currentPath={router.path}>
-      {/* Keying on the path replays the entry animation and resets page state. */}
+      {/* Keying on the path replays the entry animation, resets page state and
+          gives the error boundary a clean slate on every navigation. */}
       <div key={router.path} className="animate-fade-in">
-        <Suspense fallback={<PageFallback />}>{page}</Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<PageFallback />}>{page}</Suspense>
+        </ErrorBoundary>
       </div>
     </AppShell>
   )

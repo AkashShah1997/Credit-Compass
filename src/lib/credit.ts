@@ -64,7 +64,8 @@ export type FactorStatus = 'good' | 'warning' | 'critical' | 'unknown'
 /* Score bands                                                                */
 /* -------------------------------------------------------------------------- */
 
-export type BandTone = 'good' | 'warning' | 'serious' | 'critical'
+/** A rating, not an alarm: "Good" is where most files sit and gets the neutral mark. */
+export type BandTone = 'good' | 'info' | 'warning' | 'critical'
 
 export interface ScoreBand {
   label: string
@@ -77,10 +78,15 @@ export interface ScoreBand {
 export const SCORE_BANDS: readonly ScoreBand[] = [
   { label: 'Excellent', min: 760, max: 900, tone: 'good' },
   { label: 'Very good', min: 725, max: 759, tone: 'good' },
-  { label: 'Good', min: 660, max: 724, tone: 'warning' },
-  { label: 'Fair', min: 560, max: 659, tone: 'serious' },
+  { label: 'Good', min: 660, max: 724, tone: 'info' },
+  { label: 'Fair', min: 560, max: 659, tone: 'warning' },
   { label: 'Poor', min: 300, max: 559, tone: 'critical' },
 ]
+
+/** `+12`, `−65`, `0` — score deltas with a true minus sign. */
+export function signedPoints(points: number): string {
+  return points > 0 ? `+${points}` : points < 0 ? `−${Math.abs(points)}` : '0'
+}
 
 export function scoreBand(score: number): ScoreBand {
   return SCORE_BANDS.find((band) => score >= band.min) ?? SCORE_BANDS[SCORE_BANDS.length - 1]
@@ -721,7 +727,7 @@ export function creditRecommendations(state: AppState, today = todayISO()): Reco
       impact: 'medium',
       timing: 'ongoing',
       title: `Your ${newest.label} is ${formatTenure(newest.months)} old — the dip is expected`,
-      detail: `Opening it added a hard inquiry, a brand-new account and a lower average age all at once; a 40–80 point drop is normal${since ? ` (yours: ${since.change > 0 ? '+' : ''}${since.change} since ${monthLabel(monthKey(since.before.date))})` : ''}. Those effects fade on their own: the inquiry stops counting at twelve months and the account stops reading as "new" around the same time. ${payments.onTimeLoanPayments > 0 ? `${payments.onTimeLoanPayments} on-time payment${payments.onTimeLoanPayments === 1 ? '' : 's'} so far ${payments.onTimeLoanPayments === 1 ? 'is' : 'are'} doing the repair` : 'On-time payments do the repair'} — what would set it back is opening or closing another account.`,
+      detail: `Opening it added a hard inquiry, a brand-new account and a lower average age all at once; a 40–80 point drop is normal${since ? ` (yours: ${signedPoints(since.change)} since ${monthLabel(monthKey(since.before.date))})` : ''}. Those effects fade on their own: the inquiry stops counting at twelve months and the account stops reading as "new" around the same time. ${payments.onTimeLoanPayments > 0 ? `${payments.onTimeLoanPayments} on-time payment${payments.onTimeLoanPayments === 1 ? '' : 's'} so far ${payments.onTimeLoanPayments === 1 ? 'is' : 'are'} doing the repair` : 'On-time payments do the repair'} — what would set it back is opening or closing another account.`,
       effect: `Expect most of the recovery between month 12 and 18 — roughly ${monthLabel(addMonths(openedMonth, 12))} to ${monthLabel(addMonths(openedMonth, 18))}.`,
       href: newest.kind === 'instalment' ? '#/loans' : '#/cards',
     })
