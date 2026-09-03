@@ -12,6 +12,7 @@ import { useAppState } from '../../store/AppStore'
 import { useTheme } from '../../store/ThemeProvider'
 import { cn } from '../../lib/cn'
 import { initials } from '../../lib/format'
+import { APP_INITIALS, APP_NAME } from '../../lib/brand'
 import { hrefFor } from '../../hooks/useRouter'
 import { Button, IconButton } from '../ui/Button'
 import { NotificationCenter } from './NotificationCenter'
@@ -97,7 +98,7 @@ export function AppShell({ currentPath, children }: { currentPath: string; child
 
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink">
-                  {active?.label ?? 'MoneyFlow'}
+                  {active?.label ?? APP_NAME}
                 </h1>
               </div>
 
@@ -142,7 +143,7 @@ export function AppShell({ currentPath, children }: { currentPath: string; child
                 aria-label="Settings and profile"
                 title={settings.name}
               >
-                {initials(settings.name) || 'MF'}
+                {initials(settings.name) || APP_INITIALS}
               </a>
             </div>
           </header>

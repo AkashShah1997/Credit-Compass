@@ -7,14 +7,16 @@
     <meta name="theme-color" content="#f6f7f9" />
     <meta
       name="description"
-      content="MoneyFlow — track income, expenses, savings, investments, loans and budgets in one place."
+      content="CreditCompass — understand your credit utilization, track your score and manage income, expenses, savings, loans and cards in one place."
     />
-    <title>MoneyFlow — Personal Finance</title>
+    <title>CreditCompass — Credit health & personal finance</title>
     <script>
       // Apply the stored theme before first paint so there is no flash of the wrong mode.
       ;(function () {
         try {
-          var stored = localStorage.getItem('moneyflow.theme') || 'system'
+          // The second key is the pre-rename one, so an existing install keeps its theme.
+          var stored =
+            localStorage.getItem('creditcompass.theme') || localStorage.getItem('moneyflow.theme') || 'system'
           var resolved =
             stored === 'system'
               ? window.matchMedia('(prefers-color-scheme: dark)').matches

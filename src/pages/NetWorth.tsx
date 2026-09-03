@@ -258,7 +258,7 @@ export default function NetWorth() {
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Net worth"
-        subtitle="Everything you own, minus everything you owe — pulled together from every part of MoneyFlow."
+        subtitle="Everything you own, minus everything you owe — pulled together from every part of CreditCompass."
         action={
           <>
             <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditor({ kind: 'asset' })}>
@@ -493,7 +493,7 @@ export default function NetWorth() {
       <LedgerCard
         anchorId={ASSETS_ANCHOR}
         title="Assets you keep up to date"
-        subtitle="Balances MoneyFlow cannot see for itself — bank, cash, property, vehicles, gold, receivables"
+        subtitle="Balances CreditCompass cannot see for itself — bank, cash, property, vehicles, gold, receivables"
         icon={<Wallet className="h-4 w-4" />}
         nameHeading="Asset"
         valueHeading="Value"
@@ -966,7 +966,7 @@ function EntryFormModal({
       title={entry ? `Edit ${isAsset ? 'asset' : 'liability'}` : `Add ${isAsset ? 'an asset' : 'a liability'}`}
       description={
         isAsset
-          ? 'Anything you own that MoneyFlow cannot see — investments and savings goals are already counted.'
+          ? 'Anything you own that CreditCompass cannot see — investments and savings goals are already counted.'
           : 'Anything you owe outside loans and credit cards — those two keep themselves up to date.'
       }
       footer={

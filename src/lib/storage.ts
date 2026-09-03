@@ -11,10 +11,14 @@
 
 import type { AppState } from '../types'
 import { buildSeedState } from './seed'
+import { APP_NAME, STORAGE_NAMESPACE } from './brand'
 
-export const STORAGE_KEY = 'moneyflow.state.v1'
-export const THEME_KEY = 'moneyflow.theme'
+export const STORAGE_KEY = `${STORAGE_NAMESPACE}.state.v1`
+export const THEME_KEY = `${STORAGE_NAMESPACE}.theme`
 export const STATE_VERSION = 1
+
+/** The key used before the rename — read as a fallback so nobody loses a workspace. */
+const LEGACY_STORAGE_KEY = 'moneyflow.state.v1'
 
 export interface FinanceRepository {
   /** Immediate read, when the backing store supports it. */
@@ -72,7 +76,8 @@ class LocalStorageRepository implements FinanceRepository {
   loadSync(): AppState | null {
     if (!this.available) return this.memory
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
+      const raw =
+        window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY)
       if (!raw) return null
       return migrate(JSON.parse(raw))
     } catch {
@@ -119,6 +124,6 @@ export function serializeState(state: AppState): string {
 
 export function deserializeState(json: string): AppState {
   const parsed = migrate(JSON.parse(json))
-  if (!parsed) throw new Error('That file does not look like a MoneyFlow backup.')
+  if (!parsed) throw new Error(`That file does not look like a ${APP_NAME} backup.`)
   return parsed
 }

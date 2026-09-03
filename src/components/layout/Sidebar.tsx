@@ -4,6 +4,7 @@ import { cn } from '../../lib/cn'
 import { useAppState } from '../../store/AppStore'
 import { netWorthBreakdown } from '../../lib/finance'
 import { formatCompactCurrency } from '../../lib/format'
+import { APP_NAME, APP_TAGLINE } from '../../lib/brand'
 import { hrefFor } from '../../hooks/useRouter'
 import { IconButton } from '../ui/Button'
 
@@ -48,8 +49,8 @@ export function SidebarContent({
             <Sparkles className="h-[18px] w-[18px]" aria-hidden="true" />
           </span>
           <span>
-            <span className="block text-[15px] leading-tight font-semibold tracking-[-0.02em] text-ink">MoneyFlow</span>
-            <span className="block text-[11px] leading-tight text-muted">Personal finance</span>
+            <span className="block text-[15px] leading-tight font-semibold tracking-[-0.02em] text-ink">{APP_NAME}</span>
+            <span className="block text-[11px] leading-tight text-muted">{APP_TAGLINE}</span>
           </span>
         </a>
         {onClose ? (

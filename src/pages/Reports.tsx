@@ -63,6 +63,7 @@ import {
   percentChange,
 } from '../lib/format'
 import { FLOW_COLORS, NEUTRAL_SERIES, categoryColor, seriesColor } from '../lib/palette'
+import { FILE_PREFIX } from '../lib/brand'
 import {
   exportMonthlyPdf,
   exportTransactionsCsv,
@@ -184,7 +185,7 @@ export default function Reports() {
           () =>
             exportTransactionsExcel(
               periodTransactions,
-              `MoneyFlow-${scope === 'monthly' ? month : activeYear}-transactions.xlsx`,
+              `${FILE_PREFIX}-${scope === 'monthly' ? month : activeYear}-transactions.xlsx`,
             ),
           'Transactions exported to Excel.',
         ),

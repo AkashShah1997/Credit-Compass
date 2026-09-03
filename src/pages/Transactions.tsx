@@ -688,7 +688,7 @@ export default function Transactions({ query }: { query: URLSearchParams }) {
           <EmptyState
             icon={<Wallet className="h-5 w-5" />}
             title="No transactions yet"
-            message="Log your first income or expense and this ledger fills up — everything else in MoneyFlow builds on it."
+            message="Log your first income or expense and this ledger fills up — everything else in CreditCompass builds on it."
             action={
               <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => quickAdd.addTransaction()}>
                 Add your first transaction

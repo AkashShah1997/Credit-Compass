@@ -1,5 +1,5 @@
 /**
- * MoneyFlow domain model.
+ * CreditCompass domain model.
  *
  * Every entity carries a string `id` and ISO-8601 date strings (`YYYY-MM-DD`)
  * rather than Date objects, so the whole state tree survives a JSON round-trip

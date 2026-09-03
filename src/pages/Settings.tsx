@@ -91,7 +91,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `moneyflow-backup-${todayISO()}.json`
+    anchor.download = `creditcompass-backup-${todayISO()}.json`
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
@@ -113,14 +113,14 @@ export default function Settings() {
       const candidate = toAppState(parsed)
       if (!candidate) {
         toast.warn(
-          `“${file.name}” is not a MoneyFlow backup — it needs a “settings” object and a “transactions” list.`,
+          `“${file.name}” is not a CreditCompass backup — it needs a “settings” object and a “transactions” list.`,
         )
         return
       }
       setPendingImport({ state: candidate, fileName: file.name })
       setDialog('import')
     } catch {
-      toast.warn(`Could not read “${file.name}”. Pick the JSON file MoneyFlow exported.`)
+      toast.warn(`Could not read “${file.name}”. Pick the JSON file CreditCompass exported.`)
     }
   }
 
@@ -227,7 +227,7 @@ export default function Settings() {
             <span>
               Everything you type stays in this browser&rsquo;s local storage. There is no account, no sync and no
               server — nothing is sent anywhere. The flip side: clearing site data, using private browsing, or
-              opening MoneyFlow on another browser or device gives you an empty workspace. Export a backup before
+              opening CreditCompass on another browser or device gives you an empty workspace. Export a backup before
               you clear anything.
             </span>
           </p>
@@ -243,7 +243,7 @@ export default function Settings() {
         confirmLabel="Download JSON"
         message={
           <>
-            This saves <strong className="font-medium text-ink">moneyflow-backup-{todayISO()}.json</strong> to your
+            This saves <strong className="font-medium text-ink">creditcompass-backup-{todayISO()}.json</strong> to your
             downloads folder. It contains every figure in this workspace in plain text, so keep it somewhere you
             would keep a bank statement.
           </>
@@ -319,7 +319,7 @@ function StoredDataStrip({ onLoadDemo }: { onLoadDemo: () => void }) {
     <Card>
       <CardHeader
         title="Stored on this device"
-        subtitle="Everything MoneyFlow is keeping for you right now"
+        subtitle="Everything CreditCompass is keeping for you right now"
         icon={<ShieldCheck className="h-4 w-4" />}
         action={<Badge tone="neutral">{formatBytes(bytes)}</Badge>}
       />
@@ -390,7 +390,7 @@ function ProfileCard() {
     const trimmed = name.trim()
     if (!trimmed || trimmed === settings.name) return
     updateSettings({ name: trimmed })
-    toast.success(`Saved — MoneyFlow will greet you as ${trimmed.split(' ')[0]}.`)
+    toast.success(`Saved — CreditCompass will greet you as ${trimmed.split(' ')[0]}.`)
   }
 
   function commitSalary() {
@@ -512,7 +512,7 @@ function AppearanceCard() {
 
       <p className="mt-3 text-[13px] leading-relaxed text-ink-secondary">
         {preference === 'system'
-          ? `Following your device, which is currently set to ${mode}. Change it in your OS and MoneyFlow follows immediately — no reload.`
+          ? `Following your device, which is currently set to ${mode}. Change it in your OS and CreditCompass follows immediately — no reload.`
           : `Pinned to ${preference}, so it stays put even if your device switches at sunset.`}
       </p>
 
@@ -557,7 +557,7 @@ function AlertsCard() {
     <Card className="lg:col-span-6">
       <CardHeader
         title="Alerts & reminders"
-        subtitle="When MoneyFlow speaks up, and how early"
+        subtitle="When CreditCompass speaks up, and how early"
         icon={<BellRing className="h-4 w-4" />}
       />
 
@@ -722,11 +722,11 @@ function PlanningCard() {
             are {formatPercent(fi.percent, 0)} of the way there
             {fi.yearsToFi != null
               ? `, roughly ${formatNumber(fi.yearsToFi, true)} years out at ${formatCurrency(fi.monthlyInvestment)} invested a month.`
-              : '. Add a monthly investment or SIP and MoneyFlow can estimate how long it takes.'}
+              : '. Add a monthly investment or SIP and CreditCompass can estimate how long it takes.'}
           </p>
         ) : (
           <p className="mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
-            Log a few months of expenses, or set an FI monthly figure above, and MoneyFlow will work out the corpus
+            Log a few months of expenses, or set an FI monthly figure above, and CreditCompass will work out the corpus
             you need.
           </p>
         )}
@@ -751,7 +751,7 @@ function AboutCard() {
   return (
     <Card className="lg:col-span-5">
       <CardHeader
-        title="About MoneyFlow"
+        title="About CreditCompass"
         subtitle={`Personal finance, version ${state.version}.0`}
         icon={<Sparkles className="h-4 w-4" />}
       />
