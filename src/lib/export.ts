@@ -1,9 +1,9 @@
 /**
  * Report export — PDF and Excel, both generated entirely in the browser.
  *
- * One deliberate constraint: jsPDF's built-in fonts use WinAnsi encoding, which
- * has no glyph for ₹. Printing the rupee sign there produces mojibake, so PDF
- * figures are prefixed `Rs.` while the Excel and on-screen views keep ₹.
+ * jsPDF's built-in fonts are WinAnsi, which carries `$` but not most other
+ * currency marks — so the same `formatCurrency` serves the PDF, the workbook
+ * and the screen without a substitution step.
  */
 
 import type { jsPDF } from 'jspdf'
@@ -25,10 +25,6 @@ import {
 import { formatDate, monthLabel, monthRange, todayISO } from './date'
 import { formatCurrency } from './format'
 import { APP_NAME, FILE_PREFIX } from './brand'
-
-/** PDF-safe currency: no ₹ glyph in the core fonts. */
-const rs = (value: number) =>
-  `Rs. ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.round(value))}`
 
 const BRAND: [number, number, number] = [42, 120, 214]
 const INK: [number, number, number] = [11, 15, 25]
@@ -161,9 +157,9 @@ export async function exportMonthlyPdf(state: AppState, month: string): Promise<
   const ctx = await startPdf('Monthly financial report', monthLabel(month, true), state.settings.name)
 
   kpiRow(ctx, [
-    { label: 'Income', value: rs(totals.income) },
-    { label: 'Expenses', value: rs(totals.expense) },
-    { label: 'Net saved', value: rs(totals.net) },
+    { label: 'Income', value: formatCurrency(totals.income) },
+    { label: 'Expenses', value: formatCurrency(totals.expense) },
+    { label: 'Net saved', value: formatCurrency(totals.net) },
     { label: 'Savings rate', value: `${totals.savingsRate.toFixed(1)}%` },
   ])
 
@@ -174,7 +170,7 @@ export async function exportMonthlyPdf(state: AppState, month: string): Promise<
     table(
       ctx,
       ['Category', 'Amount', 'Share', 'Entries'],
-      breakdown.map((row) => [row.category, rs(row.amount), `${row.share.toFixed(1)}%`, row.count]),
+      breakdown.map((row) => [row.category, formatCurrency(row.amount), `${row.share.toFixed(1)}%`, row.count]),
     )
   }
 
@@ -186,9 +182,9 @@ export async function exportMonthlyPdf(state: AppState, month: string): Promise<
       ['Category', 'Budget', 'Spent', 'Remaining', 'Used'],
       budgets.map((row) => [
         row.category,
-        rs(row.limit),
-        rs(row.spent),
-        rs(row.remaining),
+        formatCurrency(row.limit),
+        formatCurrency(row.spent),
+        formatCurrency(row.remaining),
         `${Math.round(row.usedPercent)}%`,
       ]),
     )
@@ -206,7 +202,7 @@ export async function exportMonthlyPdf(state: AppState, month: string): Promise<
           t.note,
           t.category,
           t.method,
-          `${t.type === 'income' ? '+' : '-'}${rs(t.amount)}`,
+          `${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount)}`,
         ]),
       4,
     )
@@ -223,9 +219,9 @@ export async function exportYearlyPdf(state: AppState, year: number): Promise<vo
   const ctx = await startPdf('Yearly financial summary', String(year), state.settings.name)
 
   kpiRow(ctx, [
-    { label: 'Total income', value: rs(summary.income) },
-    { label: 'Total expenses', value: rs(summary.expense) },
-    { label: 'Net saved', value: rs(summary.net) },
+    { label: 'Total income', value: formatCurrency(summary.income) },
+    { label: 'Total expenses', value: formatCurrency(summary.expense) },
+    { label: 'Net saved', value: formatCurrency(summary.net) },
     { label: 'Savings rate', value: `${summary.savingsRate.toFixed(1)}%` },
   ])
 
@@ -235,9 +231,9 @@ export async function exportYearlyPdf(state: AppState, year: number): Promise<vo
     ['Month', 'Income', 'Expenses', 'Net', 'Savings rate'],
     summary.months.map((row) => [
       row.label,
-      rs(row.income),
-      rs(row.expense),
-      rs(row.net),
+      formatCurrency(row.income),
+      formatCurrency(row.expense),
+      formatCurrency(row.net),
       `${row.savingsRate.toFixed(1)}%`,
     ]),
   )
@@ -249,7 +245,7 @@ export async function exportYearlyPdf(state: AppState, year: number): Promise<vo
     categoryBreakdown(
       state.transactions.filter((t) => t.date.startsWith(String(year))),
       'expense',
-    ).map((row) => [row.category, rs(row.amount), `${row.share.toFixed(1)}%`]),
+    ).map((row) => [row.category, formatCurrency(row.amount), `${row.share.toFixed(1)}%`]),
   )
 
   sectionTitle(ctx, 'Financial position')
@@ -257,13 +253,13 @@ export async function exportYearlyPdf(state: AppState, year: number): Promise<vo
     ctx,
     ['Item', 'Value'],
     [
-      ['Total assets', rs(worth.totalAssets)],
-      ['Total liabilities', rs(worth.totalLiabilities)],
-      ['Net worth', rs(worth.netWorth)],
-      ['Investments invested', rs(investments.invested)],
-      ['Investments current value', rs(investments.currentValue)],
-      ['Unrealised gain / loss', rs(investments.gain)],
-      ['Credit card dues', rs(totalCardOutstanding(state.cards))],
+      ['Total assets', formatCurrency(worth.totalAssets)],
+      ['Total liabilities', formatCurrency(worth.totalLiabilities)],
+      ['Net worth', formatCurrency(worth.netWorth)],
+      ['Investments invested', formatCurrency(investments.invested)],
+      ['Investments current value', formatCurrency(investments.currentValue)],
+      ['Unrealised gain / loss', formatCurrency(investments.gain)],
+      ['Credit card dues', formatCurrency(totalCardOutstanding(state.cards))],
     ],
   )
 
@@ -282,9 +278,9 @@ export async function exportTransactionsPdf(
 
   kpiRow(ctx, [
     { label: 'Entries', value: String(transactions.length) },
-    { label: 'Income', value: rs(income) },
-    { label: 'Expenses', value: rs(expense) },
-    { label: 'Net', value: rs(income - expense) },
+    { label: 'Income', value: formatCurrency(income) },
+    { label: 'Expenses', value: formatCurrency(expense) },
+    { label: 'Net', value: formatCurrency(income - expense) },
   ])
 
   table(
@@ -297,7 +293,7 @@ export async function exportTransactionsPdf(
         t.note,
         t.category,
         t.method,
-        `${t.type === 'income' ? '+' : '-'}${rs(t.amount)}`,
+        `${t.type === 'income' ? '+' : '-'}${formatCurrency(t.amount)}`,
       ]),
     4,
   )
@@ -356,7 +352,7 @@ export async function exportWorkbook(
         ['Owner', state.settings.name],
         ['Generated', formatDate(todayISO())],
         [],
-        ['Position', 'Amount (INR)'],
+        ['Position', 'Amount (CAD)'],
         ['Total assets', worth.totalAssets],
         ['Total liabilities', worth.totalLiabilities],
         ['Net worth', worth.netWorth],
@@ -441,7 +437,7 @@ export async function exportWorkbook(
     sheetFromRows(
       XLSX,
       [
-        ['Holding', 'Type', 'Invested', 'Current value', 'Gain/Loss', 'Return %', 'Monthly SIP', 'Started'],
+        ['Holding', 'Type', 'Invested', 'Current value', 'Gain/Loss', 'Return %', 'Monthly contribution', 'Started'],
         ...state.investments.map((inv) => [
           inv.name,
           inv.type,
@@ -463,7 +459,7 @@ export async function exportWorkbook(
     sheetFromRows(
       XLSX,
       [
-        ['Loan', 'Lender', 'Principal', 'Rate %', 'EMI', 'Paid', 'Tenure', 'Outstanding', 'Next due'],
+        ['Loan', 'Lender', 'Principal', 'Rate %', 'Payment', 'Paid', 'Tenure', 'Outstanding', 'Next due'],
         ...state.loans.map((loan) => {
           const summary = summariseLoan(loan)
           return [
@@ -471,7 +467,7 @@ export async function exportWorkbook(
             loan.lender,
             loan.principal,
             loan.interestRate,
-            loan.emiAmount,
+            loan.paymentAmount,
             loan.paidMonths,
             loan.tenureMonths,
             summary.outstanding,

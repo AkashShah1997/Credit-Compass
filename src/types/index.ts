@@ -13,14 +13,19 @@
 
 export type TransactionType = 'income' | 'expense'
 
+/**
+ * Exactly eight hued categories plus a neutral `Other`. The chart palette has
+ * eight validated slots and never cycles, so adding a ninth category here means
+ * taking a slot from another — see `EXPENSE_SLOT` in `lib/palette.ts`.
+ */
 export const EXPENSE_CATEGORIES = [
   'Rent',
-  'Food',
-  'Travel',
+  'Food & Dining',
+  'Transport',
   'Shopping',
-  'EMI',
+  'Loan Payment',
   'Investments',
-  'Medical',
+  'Bills & Utilities',
   'Entertainment',
   'Other',
 ] as const
@@ -33,6 +38,7 @@ export const INCOME_CATEGORIES = [
   'Dividend',
   'Rental Income',
   'Refund',
+  'Government Benefit',
   'Other',
 ] as const
 
@@ -41,12 +47,12 @@ export type IncomeCategory = (typeof INCOME_CATEGORIES)[number]
 export type Category = ExpenseCategory | IncomeCategory
 
 export const PAYMENT_METHODS = [
-  'UPI',
-  'Bank Transfer',
+  'Debit',
   'Credit Card',
-  'Debit Card',
+  'Interac e-Transfer',
+  'Pre-authorized Debit',
+  'Bank Transfer',
   'Cash',
-  'Auto-debit',
 ] as const
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
@@ -124,14 +130,14 @@ export interface SavingsGoal {
 /* Investments                                                                */
 /* -------------------------------------------------------------------------- */
 
+/** Registered and non-registered account wrappers, the way Canadians think about holdings. */
 export const INVESTMENT_TYPES = [
-  'SIP',
-  'Mutual Fund',
-  'Stock',
-  'Gold',
-  'Fixed Deposit',
-  'PPF',
-  'NPS',
+  'TFSA',
+  'RRSP',
+  'FHSA',
+  'Non-registered',
+  'GIC',
+  'Crypto',
   'Other',
 ] as const
 
@@ -152,10 +158,10 @@ export interface Investment {
   invested: number
   /** Latest market value. */
   currentValue: number
-  /** Recurring instalment — only meaningful for SIP-style holdings. */
+  /** Recurring contribution, when the account is topped up every month. */
   monthlyAmount?: number
-  /** Day of month the SIP debits. */
-  sipDay?: number
+  /** Day of the month the contribution is debited (1–28). */
+  contributionDay?: number
   units?: number
   startDate: string
   active: boolean
@@ -165,16 +171,14 @@ export interface Investment {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Loans & EMIs                                                               */
+/* Loans                                                                      */
 /* -------------------------------------------------------------------------- */
 
 export const LOAN_TYPES = [
-  'Home Loan',
-  'Car Loan',
+  'Mortgage',
+  'Auto Loan',
   'Personal Loan',
-  'Education Loan',
-  'Gold Loan',
-  'Consumer Durable',
+  'Student Loan',
   'Other',
 ] as const
 
@@ -188,11 +192,12 @@ export interface Loan {
   principal: number
   /** Annual nominal rate, in percent. */
   interestRate: number
-  emiAmount: number
+  /** The fixed monthly instalment. */
+  paymentAmount: number
   tenureMonths: number
   paidMonths: number
   startDate: string
-  /** Day of the month the EMI is debited (1–28). */
+  /** Day of the month the payment is debited (1–28). */
   dueDay: number
   active: boolean
 }
@@ -221,19 +226,17 @@ export interface CreditCard {
 /* -------------------------------------------------------------------------- */
 
 export const ASSET_TYPES = [
-  'Bank Balance',
+  'Chequing',
+  'Savings',
   'Cash',
   'Property',
   'Vehicle',
-  'Gold & Jewellery',
-  'Receivable',
   'Other',
 ] as const
 
 export const LIABILITY_TYPES = [
   'Personal Debt',
-  'Tax Payable',
-  'Rent Deposit Due',
+  'Tax Owing',
   'Other',
 ] as const
 
@@ -244,6 +247,8 @@ export interface Asset {
   id: string
   name: string
   type: AssetType
+  /** Who holds it — CIBC, Wealthsimple, … Free text so any bank works. */
+  institution?: string
   value: number
   updatedAt: string
 }
@@ -269,7 +274,7 @@ export interface Settings {
   salaryDay: number
   /** Percent of a category budget at which a warning fires (before 100%). */
   budgetAlertThreshold: number
-  /** Days of notice for EMI and card-bill reminders. */
+  /** Days of notice for loan-payment and card-bill reminders. */
   reminderLeadDays: number
   /** Expected annual return used for FI and forecast projections, percent. */
   expectedReturnRate: number
@@ -287,7 +292,7 @@ export interface Settings {
 /* -------------------------------------------------------------------------- */
 
 export type NotificationSeverity = 'info' | 'warning' | 'serious' | 'critical'
-export type NotificationKind = 'emi' | 'card' | 'budget' | 'goal' | 'salary' | 'investment'
+export type NotificationKind = 'loan' | 'card' | 'budget' | 'goal' | 'salary' | 'investment'
 
 export interface AppNotification {
   /** Stable across renders so dismissals persist — kind + entity + period. */

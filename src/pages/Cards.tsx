@@ -868,7 +868,7 @@ function CardFormModal({ card, onClose }: { card: CreditCard | null; onClose: ()
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Card name" required error={errors.name} hint="For example, Amazon Pay ICICI">
+        <Field label="Card name" required error={errors.name} hint="For example, CIBC Dividend Visa">
           {(id) => (
             <TextInput
               id={id}
@@ -887,7 +887,7 @@ function CardFormModal({ card, onClose }: { card: CreditCard | null; onClose: ()
               id={id}
               value={values.issuer}
               invalid={Boolean(errors.issuer)}
-              placeholder="HDFC Bank"
+              placeholder="CIBC"
               autoComplete="off"
               onChange={(event) => set('issuer')(event.target.value)}
             />

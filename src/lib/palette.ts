@@ -70,12 +70,12 @@ export function seriesColor(index: number, mode: Mode): string {
  */
 const EXPENSE_SLOT: Record<ExpenseCategory, number> = {
   Rent: 0,
-  Food: 1,
-  Travel: 2,
+  'Food & Dining': 1,
+  Transport: 2,
   Shopping: 3,
-  EMI: 4,
+  'Loan Payment': 4,
   Investments: 5,
-  Medical: 6,
+  'Bills & Utilities': 6,
   Entertainment: 7,
   Other: -1, // neutral by design — the documented ninth-series fold
 }
@@ -86,13 +86,12 @@ export function categoryColor(category: string, mode: Mode): string {
 }
 
 const INVESTMENT_SLOT: Record<InvestmentType, number> = {
-  SIP: 0,
-  'Mutual Fund': 2,
-  Stock: 6,
-  Gold: 3,
-  'Fixed Deposit': 1,
-  PPF: 5,
-  NPS: 4,
+  TFSA: 0,
+  RRSP: 2,
+  FHSA: 6,
+  'Non-registered': 3,
+  GIC: 1,
+  Crypto: 4,
   Other: -1,
 }
 

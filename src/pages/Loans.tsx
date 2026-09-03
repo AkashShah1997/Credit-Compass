@@ -18,10 +18,10 @@ import { useChartMode } from '../store/ThemeProvider'
 import type { AmortisationRow, LoanSummary } from '../lib/finance'
 import {
   amortisationSchedule,
-  calculateEmi,
+  calculateLoanPayment,
   summariseLoan,
   totalLoanOutstanding,
-  totalMonthlyEmi,
+  totalMonthlyLoanPayments,
 } from '../lib/finance'
 import {
   addMonths,
@@ -107,7 +107,7 @@ export default function Loans() {
   const openLoans = useMemo(() => loans.filter(isOpen), [loans])
 
   const outstanding = useMemo(() => totalLoanOutstanding(loans), [loans])
-  const emiOutflow = useMemo(() => totalMonthlyEmi(loans), [loans])
+  const paymentOutflow = useMemo(() => totalMonthlyLoanPayments(loans), [loans])
   const interestPaid = useMemo(
     () => loans.reduce((sum, loan) => sum + (summaryById.get(loan.id)?.interestPaid ?? 0), 0),
     [loans, summaryById],
@@ -199,7 +199,7 @@ export default function Loans() {
     } else {
       actions.addLoan(input)
       toast.success(
-        `${input.name} added — ${formatCurrency(input.emiAmount)} a month for ${formatTenure(input.tenureMonths)}.`,
+        `${input.name} added — ${formatCurrency(input.paymentAmount)} a month for ${formatTenure(input.tenureMonths)}.`,
       )
     }
     setFormOpen(false)
@@ -209,12 +209,12 @@ export default function Loans() {
   const confirmPay = () => {
     if (!payLoan) return
     const instalment = Math.min(payLoan.paidMonths + 1, payLoan.tenureMonths)
-    actions.payEmi(payLoan.id)
+    actions.recordLoanPayment(payLoan.id)
     setPayId(null)
-    // The store books an EMI expense alongside the instalment, so say so — an
-    // unexplained new transaction is the kind of surprise that erodes trust.
+    // The store books a Loan Payment expense alongside the instalment, so say so —
+    // an unexplained new transaction is the kind of surprise that erodes trust.
     toast.success(
-      `Instalment ${instalment} of ${payLoan.tenureMonths} recorded for ${payLoan.name}. An EMI expense was logged in transactions.`,
+      `Payment ${instalment} of ${payLoan.tenureMonths} recorded for ${payLoan.name}. A loan-payment expense was logged in transactions.`,
       { label: 'View', onClick: () => (window.location.hash = hrefFor('/transactions')) },
     )
   }
@@ -225,16 +225,16 @@ export default function Loans() {
     setDeleteId(null)
     if (selectedId === deleteLoan.id) setSelectedId(null)
     if (scheduleId === deleteLoan.id) setScheduleId(null)
-    toast.success(`${deleteLoan.name} deleted. Its logged EMI transactions were kept.`)
+    toast.success(`${deleteLoan.name} deleted. Its logged payment transactions were kept.`)
   }
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        title="Loans & EMI"
+        title="Loans"
         subtitle={
           openLoans.length
-            ? `${openLoans.length} running loan${openLoans.length === 1 ? '' : 's'} · ${formatCurrency(emiOutflow)} leaves your account every month.`
+            ? `${openLoans.length} running loan${openLoans.length === 1 ? '' : 's'} · ${formatCurrency(paymentOutflow)} leaves your account every month.`
             : 'Track every borrowing, its instalments and the day you are free of it.'
         }
         action={
@@ -259,11 +259,11 @@ export default function Loans() {
           trendColor={balanceColor}
         />
         <StatTile
-          label="Monthly EMI outflow"
-          value={formatCurrency(emiOutflow)}
+          label="Monthly loan payments"
+          value={formatCurrency(paymentOutflow)}
           sub={
             state.settings.monthlySalary > 0
-              ? `${formatPercent((emiOutflow / state.settings.monthlySalary) * 100, 0)} of your monthly salary`
+              ? `${formatPercent((paymentOutflow / state.settings.monthlySalary) * 100, 0)} of your monthly salary`
               : `${openLoans.length} instalment${openLoans.length === 1 ? '' : 's'} a month`
           }
           icon={<Banknote className="h-4 w-4" />}
@@ -296,7 +296,7 @@ export default function Loans() {
           <EmptyState
             icon={<Landmark className="h-5 w-5" />}
             title="No loans tracked yet"
-            message="Add a home, car, personal or consumer-durable loan to see its EMI schedule, interest split and payoff date."
+            message="Add a mortgage, auto, personal or student loan to see its payment schedule, interest split and payoff date."
             action={
               <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => openForm(null)}>
                 Add your first loan
@@ -382,10 +382,10 @@ export default function Loans() {
                     </div>
                   </dl>
                   <a
-                    href={hrefFor('/transactions', { category: 'EMI' })}
+                    href={hrefFor('/transactions', { category: 'Loan Payment' })}
                     className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-brand hover:underline"
                   >
-                    See every EMI transaction
+                    See every loan payment
                   </a>
                 </>
               )}
@@ -407,7 +407,7 @@ export default function Loans() {
                       value: summary?.outstanding ?? 0,
                       color: colorById.get(loan.id) ?? balanceColor,
                       share: outstanding > 0 ? ((summary?.outstanding ?? 0) / outstanding) * 100 : 0,
-                      meta: `${loan.lender} · ${formatCurrency(loan.emiAmount)}/mo · ${formatTenure(summary?.remainingMonths ?? 0)} left`,
+                      meta: `${loan.lender} · ${formatCurrency(loan.paymentAmount)}/mo · ${formatTenure(summary?.remainingMonths ?? 0)} left`,
                     }
                   })
                   .sort((a, b) => b.value - a.value)}
@@ -466,17 +466,17 @@ export default function Loans() {
                     { label: 'Interest', color: interestColor },
                   ]}
                   table={{
-                    columns: ['Instalment', 'Due', 'Principal', 'Interest', 'EMI'],
+                    columns: ['Instalment', 'Due', 'Principal', 'Interest', 'Payment'],
                     numericFrom: 2,
                     rows: upcoming.map((row) => [
                       `#${row.index}`,
                       formatDate(row.dueDate),
                       formatCurrency(row.principalPaid),
                       formatCurrency(row.interestPaid),
-                      formatCurrency(row.emi),
+                      formatCurrency(row.payment),
                     ]),
                   }}
-                  footnote="Each bar is one EMI. Early in a loan most of it is interest; the principal share grows every month."
+                  footnote="Each bar is one payment. Early in a loan most of it is interest; the principal share grows every month."
                   empty={
                     upcoming.length === 0 ? (
                       <EmptyState
@@ -529,7 +529,7 @@ export default function Loans() {
                       ]),
                     ],
                   }}
-                  footnote="Assumes the EMI stays exactly as it is. A part-prepayment or a rate revision pulls this curve in."
+                  footnote="Assumes the payment stays exactly as it is. A lump-sum prepayment or a rate change pulls this curve in."
                   empty={
                     balanceData.length === 0 ? (
                       <EmptyState
@@ -579,15 +579,15 @@ export default function Loans() {
       <ConfirmDialog
         open={payLoan != null}
         destructive={false}
-        title="Record this EMI payment?"
+        title="Record this loan payment?"
         confirmLabel="Record payment"
         message={
           payLoan ? (
             <>
               This marks instalment {Math.min(payLoan.paidMonths + 1, payLoan.tenureMonths)} of{' '}
               {payLoan.tenureMonths} on <strong className="font-medium text-ink">{payLoan.name}</strong> as
-              paid and logs an EMI expense of{' '}
-              <strong className="font-medium text-ink">{formatCurrency(payLoan.emiAmount)}</strong> in your
+              paid and logs a loan-payment expense of{' '}
+              <strong className="font-medium text-ink">{formatCurrency(payLoan.paymentAmount)}</strong> in your
               transactions. The outstanding balance drops to about{' '}
               {formatCurrency(payLeavesBalance)}.
             </>
@@ -607,7 +607,7 @@ export default function Loans() {
           deleteLoan ? (
             <>
               <strong className="font-medium text-ink">{deleteLoan.name}</strong> from {deleteLoan.lender} and
-              its schedule will be removed. EMI transactions already logged against it stay in your history.
+              its schedule will be removed. Payment transactions already logged against it stay in your history.
               This cannot be undone.
             </>
           ) : (
@@ -687,7 +687,7 @@ function LoanCard({
               {!running ? (
                 <Badge tone="neutral">{loan.paidMonths >= loan.tenureMonths ? 'Closed' : 'Paused'}</Badge>
               ) : null}
-              {loggedThisMonth ? <StatusBadge status="good">EMI logged this month</StatusBadge> : null}
+              {loggedThisMonth ? <StatusBadge status="good">Payment logged this month</StatusBadge> : null}
               {dueSoon && !loggedThisMonth ? (
                 <StatusBadge status={days <= 0 ? 'serious' : 'warning'}>
                   {days <= 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`}
@@ -697,9 +697,9 @@ function LoanCard({
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[11.5px] text-muted">Monthly EMI</p>
+          <p className="text-[11.5px] text-muted">Monthly payment</p>
           <p className="tabular text-[17px] font-semibold tracking-[-0.01em] text-ink">
-            {formatCurrency(loan.emiAmount)}
+            {formatCurrency(loan.paymentAmount)}
           </p>
         </div>
       </div>
@@ -749,7 +749,7 @@ function LoanCard({
           disabled={!running}
           onClick={onPay}
         >
-          Pay EMI
+          Record payment
         </Button>
         <Button size="sm" icon={<ListOrdered className="h-4 w-4" />} onClick={onSchedule}>
           Schedule
@@ -774,11 +774,11 @@ function ScheduleModal({ loan, onClose, onPay }: { loan: Loan; onClose: () => vo
   const nextIndex = loan.paidMonths + 1
   const totals = rows.reduce(
     (acc, row) => ({
-      emi: acc.emi + row.emi,
+      payment: acc.payment + row.payment,
       principal: acc.principal + row.principalPaid,
       interest: acc.interest + row.interestPaid,
     }),
-    { emi: 0, principal: 0, interest: 0 },
+    { payment: 0, principal: 0, interest: 0 },
   )
 
   return (
@@ -802,7 +802,7 @@ function ScheduleModal({ loan, onClose, onPay }: { loan: Loan; onClose: () => vo
           <tr>
             <Th>#</Th>
             <Th>Due date</Th>
-            <Th align="right">EMI</Th>
+            <Th align="right">Payment</Th>
             <Th align="right">Principal</Th>
             <Th align="right">Interest</Th>
             <Th align="right">Balance</Th>
@@ -826,7 +826,7 @@ function ScheduleModal({ loan, onClose, onPay }: { loan: Loan; onClose: () => vo
                 <Td className="tabular font-medium">{row.index}</Td>
                 <Td className="whitespace-nowrap text-ink-secondary">{formatDate(row.dueDate)}</Td>
                 <Td align="right" className="tabular">
-                  {formatCurrency(row.emi)}
+                  {formatCurrency(row.payment)}
                 </Td>
                 <Td align="right" className="tabular text-ink-secondary">
                   {formatCurrency(row.principalPaid)}
@@ -858,7 +858,7 @@ function ScheduleModal({ loan, onClose, onPay }: { loan: Loan; onClose: () => vo
               Total over the full tenure
             </Td>
             <Td align="right" className="tabular font-semibold">
-              {formatCurrency(totals.emi)}
+              {formatCurrency(totals.payment)}
             </Td>
             <Td align="right" className="tabular text-ink-secondary">
               {formatCurrency(totals.principal)}
@@ -896,7 +896,7 @@ interface LoanDraft {
   principal: string
   interestRate: string
   tenureMonths: string
-  emiAmount: string
+  paymentAmount: string
   startDate: string
   dueDay: string
   paidMonths: string
@@ -921,7 +921,7 @@ function draftFrom(loan: Loan | null): LoanDraft {
       principal: '',
       interestRate: '',
       tenureMonths: '',
-      emiAmount: '',
+      paymentAmount: '',
       startDate: todayISO(),
       dueDay: '5',
       paidMonths: '0',
@@ -935,7 +935,7 @@ function draftFrom(loan: Loan | null): LoanDraft {
     principal: String(loan.principal),
     interestRate: String(loan.interestRate),
     tenureMonths: String(loan.tenureMonths),
-    emiAmount: String(loan.emiAmount),
+    paymentAmount: String(loan.paymentAmount),
     startDate: loan.startDate,
     dueDay: String(loan.dueDay),
     paidMonths: String(loan.paidMonths),
@@ -954,17 +954,17 @@ function LoanFormModal({
 }) {
   const [draft, setDraft] = useState<LoanDraft>(() => draftFrom(loan))
   const [errors, setErrors] = useState<DraftErrors>({})
-  /* An existing loan whose EMI already matches the formula is treated as
+  /* An existing loan whose payment already matches the formula is treated as
      untouched, so editing its rate keeps the instalment in step. */
   const [emiTouched, setEmiTouched] = useState(
-    () => loan != null && Math.abs(loan.emiAmount - calculateEmi(loan.principal, loan.interestRate, loan.tenureMonths)) > 1,
+    () => loan != null && Math.abs(loan.paymentAmount - calculateLoanPayment(loan.principal, loan.interestRate, loan.tenureMonths)) > 1,
   )
 
   const principal = num(draft.principal)
   const rate = num(draft.interestRate)
   const tenure = Math.round(num(draft.tenureMonths))
-  const emi = num(draft.emiAmount)
-  const suggested = calculateEmi(principal || 0, rate || 0, tenure || 0)
+  const emi = num(draft.paymentAmount)
+  const suggested = calculateLoanPayment(principal || 0, rate || 0, tenure || 0)
   const monthlyInterest = principal > 0 && rate > 0 ? (principal * rate) / 12 / 100 : 0
 
   const update = (patch: Partial<LoanDraft>) => {
@@ -972,12 +972,12 @@ function LoanFormModal({
       const next = { ...prev, ...patch }
       const affectsEmi = 'principal' in patch || 'interestRate' in patch || 'tenureMonths' in patch
       if (affectsEmi && !emiTouched) {
-        const computed = calculateEmi(
+        const computed = calculateLoanPayment(
           num(next.principal) || 0,
           num(next.interestRate) || 0,
           Math.round(num(next.tenureMonths)) || 0,
         )
-        next.emiAmount = computed > 0 ? String(computed) : ''
+        next.paymentAmount = computed > 0 ? String(computed) : ''
       }
       return next
     })
@@ -990,10 +990,10 @@ function LoanFormModal({
     if (!(principal > 0)) found.principal = 'Enter the amount borrowed.'
     if (!(rate >= 0) || rate > 60) found.interestRate = 'Enter a rate between 0 and 60%.'
     if (!(tenure >= 1) || tenure > 480) found.tenureMonths = 'Tenure must be 1 to 480 months.'
-    if (!(emi > 0)) found.emiAmount = 'Enter the monthly instalment.'
+    if (!(emi > 0)) found.paymentAmount = 'Enter the monthly instalment.'
     else if (monthlyInterest > 0 && emi <= monthlyInterest && tenure > 1) {
       // Below the interest accrual the balance would grow forever.
-      found.emiAmount = `EMI must beat the monthly interest of ${formatCurrency(monthlyInterest)}.`
+      found.paymentAmount = `The payment must beat the monthly interest of ${formatCurrency(monthlyInterest)}.`
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.startDate)) found.startDate = 'Pick the date the loan started.'
     const dueDay = Math.round(num(draft.dueDay))
@@ -1017,7 +1017,7 @@ function LoanFormModal({
       type: draft.type,
       principal,
       interestRate: rate,
-      emiAmount: emi,
+      paymentAmount: emi,
       tenureMonths,
       paidMonths,
       startDate: draft.startDate,
@@ -1036,7 +1036,7 @@ function LoanFormModal({
       onClose={onClose}
       size="lg"
       title={loan ? `Edit ${loan.name}` : 'Add a loan'}
-      description="EMI is suggested from the reducing-balance formula — override it if your lender rounds differently."
+      description="The payment is suggested from the standard amortization formula — override it if your lender rounds differently."
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -1064,7 +1064,7 @@ function LoanFormModal({
             <TextInput
               id={id}
               value={draft.lender}
-              placeholder="HDFC Bank"
+              placeholder="CIBC"
               invalid={Boolean(errors.lender)}
               onChange={(event) => update({ lender: event.target.value })}
             />
@@ -1092,7 +1092,7 @@ function LoanFormModal({
             <CurrencyInput
               id={id}
               value={draft.principal}
-              placeholder="550000"
+              placeholder="28000"
               invalid={Boolean(errors.principal)}
               onChange={(event) => update({ principal: event.target.value })}
             />
@@ -1115,7 +1115,7 @@ function LoanFormModal({
               step="0.05"
               className="tabular"
               value={draft.interestRate}
-              placeholder="9.5"
+              placeholder="7.49"
               invalid={Boolean(errors.interestRate)}
               onChange={(event) => update({ interestRate: event.target.value })}
             />
@@ -1138,7 +1138,7 @@ function LoanFormModal({
               step="1"
               className="tabular"
               value={draft.tenureMonths}
-              placeholder="48"
+              placeholder="72"
               invalid={Boolean(errors.tenureMonths)}
               onChange={(event) => update({ tenureMonths: event.target.value })}
             />
@@ -1146,9 +1146,9 @@ function LoanFormModal({
         </Field>
 
         <Field
-          label="Monthly EMI"
+          label="Monthly payment"
           required
-          error={errors.emiAmount}
+          error={errors.paymentAmount}
           hint={
             suggested > 0 ? (
               <span className="inline-flex flex-wrap items-center gap-2">
@@ -1158,7 +1158,7 @@ function LoanFormModal({
                     type="button"
                     onClick={() => {
                       setEmiTouched(false)
-                      setDraft((prev) => ({ ...prev, emiAmount: String(suggested) }))
+                      setDraft((prev) => ({ ...prev, paymentAmount: String(suggested) }))
                     }}
                     className="font-medium text-brand hover:underline"
                   >
@@ -1174,12 +1174,12 @@ function LoanFormModal({
           {(id) => (
             <CurrencyInput
               id={id}
-              value={draft.emiAmount}
-              placeholder="13800"
-              invalid={Boolean(errors.emiAmount)}
+              value={draft.paymentAmount}
+              placeholder="484"
+              invalid={Boolean(errors.paymentAmount)}
               onChange={(event) => {
                 setEmiTouched(true)
-                update({ emiAmount: event.target.value })
+                update({ paymentAmount: event.target.value })
               }}
             />
           )}
@@ -1198,7 +1198,7 @@ function LoanFormModal({
         </Field>
 
         <Field
-          label="EMI due day"
+          label="Payment due day"
           required
           error={errors.dueDay}
           hint="1 to 28, so it lands in every month."
@@ -1244,7 +1244,7 @@ function LoanFormModal({
             checked={draft.active}
             onChange={(next) => update({ active: next })}
             label="Loan is active"
-            description="Inactive loans stay in your history but drop out of EMI reminders and the monthly outflow."
+            description="Inactive loans stay in your history but drop out of payment reminders and the monthly outflow."
           />
         </div>
 

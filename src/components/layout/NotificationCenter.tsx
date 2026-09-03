@@ -10,7 +10,7 @@ import { cn } from '../../lib/cn'
 import { IconButton } from '../ui/Button'
 
 const KIND_ICON: Record<NotificationKind, typeof Bell> = {
-  emi: CalendarClock,
+  loan: CalendarClock,
   card: CreditCard,
   budget: Wallet,
   goal: PiggyBank,

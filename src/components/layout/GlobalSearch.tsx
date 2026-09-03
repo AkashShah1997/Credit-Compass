@@ -63,7 +63,7 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
     }
     for (const loan of state.loans) {
       if (loan.name.toLowerCase().includes(q) || loan.lender.toLowerCase().includes(q)) {
-        out.push({ id: loan.id, title: loan.name, meta: `${loan.lender} · EMI ${formatCurrency(loan.emiAmount)}`, href: '#/loans', group: 'Loans', icon: Landmark })
+        out.push({ id: loan.id, title: loan.name, meta: `${loan.lender} · ${formatCurrency(loan.paymentAmount)}/mo`, href: '#/loans', group: 'Loans', icon: Landmark })
       }
     }
     for (const card of state.cards) {

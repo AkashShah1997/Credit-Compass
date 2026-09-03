@@ -612,9 +612,9 @@ function UpcomingDues() {
       const summary = summariseLoan(loan)
       items.push({
         id: loan.id,
-        label: `${loan.name} EMI`,
-        sub: `${summary.remainingMonths} instalments left · ${formatCompactCurrency(summary.outstanding)} outstanding`,
-        amount: loan.emiAmount,
+        label: `${loan.name} payment`,
+        sub: `${summary.remainingMonths} payments left · ${formatCompactCurrency(summary.outstanding)} outstanding`,
+        amount: loan.paymentAmount,
         date: summary.nextDueDate,
         icon: Landmark,
       })

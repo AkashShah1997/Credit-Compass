@@ -586,7 +586,7 @@ function AlertsCard() {
           max={15}
           value={settings.reminderLeadDays}
           format={(n) => `${n} ${n === 1 ? 'day' : 'days'}`}
-          hint="EMI and credit-card reminders appear this far ahead of the due date, on the dashboard and in the notification tray."
+          hint="Loan-payment and credit-card reminders appear this far ahead of the due date, on the dashboard and in the notification tray."
           onCommit={(next) => {
             updateSettings({ reminderLeadDays: next })
             toast.success(`Reminders now start ${next} ${next === 1 ? 'day' : 'days'} before a due date.`)
@@ -722,7 +722,7 @@ function PlanningCard() {
             are {formatPercent(fi.percent, 0)} of the way there
             {fi.yearsToFi != null
               ? `, roughly ${formatNumber(fi.yearsToFi, true)} years out at ${formatCurrency(fi.monthlyInvestment)} invested a month.`
-              : '. Add a monthly investment or SIP and CreditCompass can estimate how long it takes.'}
+              : '. Add a recurring contribution and CreditCompass can estimate how long it takes.'}
           </p>
         ) : (
           <p className="mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
@@ -763,7 +763,7 @@ function AboutCard() {
             What it tracks
           </dt>
           <dd className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
-            Income and expenses, category budgets, savings goals, investments and SIPs, loan amortisation, credit
+            Income and expenses, category budgets, savings goals, investments and recurring contributions, loan amortisation, credit
             card cycles, manual assets and liabilities — rolled into net worth, a cash-flow forecast and a
             financial-independence projection.
           </dd>

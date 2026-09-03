@@ -47,14 +47,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Grow',
     items: [
-      { path: '/investments', label: 'Investments', short: 'Invest', icon: TrendingUp, description: 'SIPs, mutual funds, stocks and gold' },
+      { path: '/investments', label: 'Investments', short: 'Invest', icon: TrendingUp, description: 'TFSA, RRSP, FHSA, GICs and other holdings' },
       { path: '/net-worth', label: 'Net worth', icon: Scale, description: 'Assets minus liabilities over time' },
     ],
   },
   {
     label: 'Owe',
     items: [
-      { path: '/loans', label: 'Loans & EMI', short: 'Loans', icon: Landmark, description: 'Outstanding balances, EMIs and due dates' },
+      { path: '/loans', label: 'Loans', icon: Landmark, description: 'Outstanding balances, payments and due dates' },
       { path: '/cards', label: 'Credit cards', short: 'Cards', icon: CreditCard, description: 'Bills, due dates and utilisation' },
     ],
   },

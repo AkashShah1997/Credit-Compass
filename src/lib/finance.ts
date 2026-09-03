@@ -10,6 +10,7 @@ import type {
   AppNotification,
   AppState,
   Asset,
+  AssetType,
   BudgetLimits,
   BudgetsByMonth,
   Category,
@@ -44,11 +45,22 @@ import {
 const round = (n: number) => Math.round(n * 100) / 100
 
 /* -------------------------------------------------------------------------- */
-/* Loans & EMI                                                                */
+/* Assets                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Standard reducing-balance EMI: P·r·(1+r)^n / ((1+r)^n − 1). */
-export function calculateEmi(principal: number, annualRatePercent: number, months: number): number {
+/** Money that can be spent this week — what "balance" and "cash" mean everywhere. */
+export const LIQUID_ASSET_TYPES: readonly AssetType[] = ['Chequing', 'Savings', 'Cash']
+
+export function isLiquidAsset(asset: Asset): boolean {
+  return LIQUID_ASSET_TYPES.includes(asset.type)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Loans                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Standard amortized payment: P·r·(1+r)^n / ((1+r)^n − 1). */
+export function calculateLoanPayment(principal: number, annualRatePercent: number, months: number): number {
   if (principal <= 0 || months <= 0) return 0
   const r = annualRatePercent / 12 / 100
   if (r === 0) return round(principal / months)
@@ -60,7 +72,7 @@ export interface AmortisationRow {
   index: number
   month: string
   dueDate: string
-  emi: number
+  payment: number
   principalPaid: number
   interestPaid: number
   balance: number
@@ -69,7 +81,7 @@ export interface AmortisationRow {
 
 /**
  * Full amortisation schedule. The final instalment absorbs rounding so the
- * balance lands exactly on zero rather than a few paise either side.
+ * balance lands exactly on zero rather than a few cents either side.
  */
 export function amortisationSchedule(loan: Loan): AmortisationRow[] {
   const r = loan.interestRate / 12 / 100
@@ -81,12 +93,12 @@ export function amortisationSchedule(loan: Loan): AmortisationRow[] {
     const month = addMonths(startKey, i)
     const interest = round(balance * r)
     const isLast = i === loan.tenureMonths - 1
-    let emi = loan.emiAmount
-    let principalPaid = round(emi - interest)
+    let payment = loan.paymentAmount
+    let principalPaid = round(payment - interest)
 
     if (isLast || principalPaid >= balance) {
       principalPaid = balance
-      emi = round(balance + interest)
+      payment = round(balance + interest)
     }
 
     balance = round(Math.max(0, balance - principalPaid))
@@ -94,7 +106,7 @@ export function amortisationSchedule(loan: Loan): AmortisationRow[] {
       index: i + 1,
       month,
       dueDate: clampDayToMonth(month, loan.dueDay),
-      emi,
+      payment,
       principalPaid,
       interestPaid: interest,
       balance,
@@ -134,12 +146,12 @@ export function summariseLoan(loan: Loan): LoanSummary {
     remainingMonths,
     nextDueDate: nextDueDate(loan.dueDay),
     progressPercent: loan.principal ? ((loan.principal - outstanding) / loan.principal) * 100 : 0,
-    totalPayable: round(schedule.reduce((s, row) => s + row.emi, 0)),
+    totalPayable: round(schedule.reduce((s, row) => s + row.payment, 0)),
   }
 }
 
-export function totalMonthlyEmi(loans: Loan[]): number {
-  return loans.filter((l) => l.active && l.paidMonths < l.tenureMonths).reduce((s, l) => s + l.emiAmount, 0)
+export function totalMonthlyLoanPayments(loans: Loan[]): number {
+  return loans.filter((l) => l.active && l.paidMonths < l.tenureMonths).reduce((s, l) => s + l.paymentAmount, 0)
 }
 
 export function totalLoanOutstanding(loans: Loan[]): number {
@@ -397,7 +409,7 @@ export interface InvestmentSummary {
   currentValue: number
   gain: number
   gainPercent: number
-  monthlySip: number
+  monthlyContribution: number
   activeCount: number
 }
 
@@ -410,7 +422,7 @@ export function summariseInvestments(investments: Investment[]): InvestmentSumma
     currentValue,
     gain,
     gainPercent: invested ? (gain / invested) * 100 : 0,
-    monthlySip: investments
+    monthlyContribution: investments
       .filter((i) => i.active && i.monthlyAmount)
       .reduce((s, i) => s + (i.monthlyAmount ?? 0), 0),
     activeCount: investments.filter((i) => i.active).length,
@@ -488,11 +500,11 @@ export function netWorthBreakdown(state: AppState): NetWorthBreakdown {
   const manualLiabilities = state.liabilities.reduce((s, l) => s + l.value, 0)
 
   const assets = [
-    { label: 'Bank & cash', value: state.assets.filter((a) => a.type === 'Bank Balance' || a.type === 'Cash').reduce((s, a) => s + a.value, 0) },
+    { label: 'Bank & cash', value: state.assets.filter(isLiquidAsset).reduce((s, a) => s + a.value, 0) },
     { label: 'Investments', value: investmentValue },
     { label: 'Savings goals', value: savings },
     { label: 'Property & vehicles', value: state.assets.filter((a) => a.type === 'Property' || a.type === 'Vehicle').reduce((s, a) => s + a.value, 0) },
-    { label: 'Other assets', value: state.assets.filter((a) => !['Bank Balance', 'Cash', 'Property', 'Vehicle'].includes(a.type)).reduce((s, a) => s + a.value, 0) },
+    { label: 'Other assets', value: state.assets.filter((a) => !isLiquidAsset(a) && a.type !== 'Property' && a.type !== 'Vehicle').reduce((s, a) => s + a.value, 0) },
   ].filter((a) => a.value !== 0)
 
   const liabilities = [
@@ -581,12 +593,13 @@ export interface ForecastMonth {
 }
 
 /**
- * Forward projection. Committed outflows (rent, EMIs, SIPs, card minimums) are
- * known exactly; variable spend is the trailing average of the last six months.
+ * Forward projection. Committed outflows (rent, loan payments, recurring
+ * contributions) are known exactly; variable spend is the trailing average of
+ * the last six months.
  */
 export function cashFlowForecast(state: AppState, monthsAhead = 6): ForecastMonth[] {
   const history = monthRange(6, currentMonthKey())
-  const committedCategories: ExpenseCategory[] = ['Rent', 'EMI', 'Investments']
+  const committedCategories: ExpenseCategory[] = ['Rent', 'Loan Payment', 'Investments']
   const variableAvg = averageOf(
     history.map((m) =>
       transactionsInMonth(state.transactions, m)
@@ -596,18 +609,18 @@ export function cashFlowForecast(state: AppState, monthsAhead = 6): ForecastMont
   )
 
   const rent = latestCategoryAmount(state.transactions, 'Rent')
-  const emi = totalMonthlyEmi(state.loans)
-  const sip = state.investments.filter((i) => i.active).reduce((s, i) => s + (i.monthlyAmount ?? 0), 0)
+  const loanPayments = totalMonthlyLoanPayments(state.loans)
+  const contributions = state.investments.filter((i) => i.active).reduce((s, i) => s + (i.monthlyAmount ?? 0), 0)
   const goalContributions = state.goals.reduce((s, g) => s + (g.monthlyContribution ?? 0), 0)
   const income = state.settings.monthlySalary
 
   let balance = state.assets
-    .filter((a) => a.type === 'Bank Balance' || a.type === 'Cash')
+    .filter(isLiquidAsset)
     .reduce((s, a) => s + a.value, 0)
 
   return Array.from({ length: monthsAhead }, (_, i) => {
     const month = addMonths(currentMonthKey(), i + 1)
-    const committed = rent + emi + sip
+    const committed = rent + loanPayments + contributions
     const net = income - committed - variableAvg - goalContributions
     balance = round(balance + net)
     return {
@@ -655,10 +668,10 @@ export function salaryDayPlan(state: AppState): SalaryPlan {
   if (rent > 0) commitments.push({ label: 'Rent', amount: rent, date: clampDayToMonth(cycleMonth, 3), kind: 'Rent' })
 
   for (const loan of state.loans.filter((l) => l.active && l.paidMonths < l.tenureMonths)) {
-    commitments.push({ label: `${loan.name} EMI`, amount: loan.emiAmount, date: clampDayToMonth(cycleMonth, loan.dueDay), kind: 'EMI' })
+    commitments.push({ label: `${loan.name} payment`, amount: loan.paymentAmount, date: clampDayToMonth(cycleMonth, loan.dueDay), kind: 'Loan' })
   }
   for (const inv of state.investments.filter((i) => i.active && i.monthlyAmount)) {
-    commitments.push({ label: inv.name, amount: inv.monthlyAmount ?? 0, date: clampDayToMonth(cycleMonth, inv.sipDay ?? 5), kind: 'SIP' })
+    commitments.push({ label: inv.name, amount: inv.monthlyAmount ?? 0, date: clampDayToMonth(cycleMonth, inv.contributionDay ?? 1), kind: 'Contribution' })
   }
   for (const card of state.cards) {
     if (card.outstanding > 0) {
@@ -714,7 +727,7 @@ export function fiStatus(state: AppState): FiStatus {
     state.investments.reduce((s, i) => s + i.currentValue, 0) +
       totalSaved(state.goals) +
       state.assets
-        .filter((a) => a.type === 'Bank Balance' || a.type === 'Cash')
+        .filter(isLiquidAsset)
         .reduce((s, a) => s + a.value, 0) -
       totalLoanOutstanding(state.loans) -
       totalCardOutstanding(state.cards),
@@ -807,13 +820,13 @@ export function buildNotifications(state: AppState, today = todayISO()): AppNoti
     const days = daysUntil(due, today)
     if (days > lead) continue
     out.push({
-      id: `emi:${loan.id}:${monthKey(due)}`,
-      kind: 'emi',
+      id: `loan:${loan.id}:${monthKey(due)}`,
+      kind: 'loan',
       severity: days < 0 ? 'critical' : days <= 1 ? 'serious' : 'warning',
-      title: days < 0 ? `${loan.name} EMI overdue` : `${loan.name} EMI due`,
+      title: days < 0 ? `${loan.name} payment overdue` : `${loan.name} payment due`,
       detail: days < 0 ? `Was due ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago` : days === 0 ? 'Due today' : `Due in ${days} day${days === 1 ? '' : 's'}`,
       date: due,
-      amount: loan.emiAmount,
+      amount: loan.paymentAmount,
       href: '#/loans',
     })
   }
@@ -844,7 +857,7 @@ export function buildNotifications(state: AppState, today = todayISO()): AppNoti
         kind: 'budget',
         severity: 'critical',
         title: `${row.category} budget exceeded`,
-        detail: `Over by ${Math.round(row.spent - row.limit).toLocaleString('en-IN')} of ${Math.round(row.limit).toLocaleString('en-IN')}`,
+        detail: `Over by ${Math.round(row.spent - row.limit).toLocaleString('en-CA')} of ${Math.round(row.limit).toLocaleString('en-CA')}`,
         amount: row.spent - row.limit,
         href: '#/budget',
       })
@@ -854,7 +867,7 @@ export function buildNotifications(state: AppState, today = todayISO()): AppNoti
         kind: 'budget',
         severity: 'warning',
         title: `${row.category} budget almost used`,
-        detail: `${Math.round(row.usedPercent)}% spent — ${Math.round(row.remaining).toLocaleString('en-IN')} left`,
+        detail: `${Math.round(row.usedPercent)}% spent — ${Math.round(row.remaining).toLocaleString('en-CA')} left`,
         amount: row.remaining,
         href: '#/budget',
       })
@@ -911,7 +924,7 @@ export interface DashboardMetrics {
   investmentGain: number
   investmentGainPercent: number
   netWorth: number
-  emiOutflow: number
+  loanOutflow: number
   previous: MonthTotals
   incomeChange: number | null
   expenseChange: number | null
@@ -924,7 +937,7 @@ export function dashboardMetrics(state: AppState, month = currentMonthKey()): Da
   const worth = netWorthBreakdown(state)
 
   const liquid = state.assets
-    .filter((a) => a.type === 'Bank Balance' || a.type === 'Cash')
+    .filter(isLiquidAsset)
     .reduce((s, a) => s + a.value, 0)
 
   return {
@@ -940,7 +953,7 @@ export function dashboardMetrics(state: AppState, month = currentMonthKey()): Da
     investmentGain: investments.gain,
     investmentGainPercent: investments.gainPercent,
     netWorth: worth.netWorth,
-    emiOutflow: totalMonthlyEmi(state.loans),
+    loanOutflow: totalMonthlyLoanPayments(state.loans),
     previous,
     incomeChange: previous.income ? ((current.income - previous.income) / previous.income) * 100 : null,
     expenseChange: previous.expense ? ((current.expense - previous.expense) / previous.expense) * 100 : null,
@@ -1009,13 +1022,17 @@ export function sortLiabilities(items: Liability[]): Liability[] {
 
 export function defaultSettings(): Settings {
   return {
-    name: 'Aarav Sharma',
-    monthlySalary: 80000,
+    name: 'Jordan Lee',
+    // Monthly take-home, after tax — Canadian pay is often biweekly, but the
+    // planning maths works on a monthly figure.
+    monthlySalary: 5200,
     salaryDay: 1,
     budgetAlertThreshold: 80,
     reminderLeadDays: 5,
-    expectedReturnRate: 12,
-    inflationRate: 6,
+    // Long-run nominal return on a diversified Canadian/global equity mix, and
+    // the Bank of Canada's inflation target band midpoint plus a little.
+    expectedReturnRate: 7,
+    inflationRate: 3,
     safeWithdrawalRate: 4,
     fiMonthlyExpenses: 0,
     theme: 'system',

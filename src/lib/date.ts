@@ -187,13 +187,6 @@ export function isWithin(iso: string, from: string, to: string): boolean {
   return iso >= from && iso <= to
 }
 
-export function financialYearKey(iso: string): string {
-  // Indian financial year: April → March.
-  const d = parseISO(iso)
-  const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1
-  return `FY ${String(y).slice(2)}-${String(y + 1).slice(2)}`
-}
-
 export function yearOf(key: string): number {
   return Number(key.slice(0, 4))
 }

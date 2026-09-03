@@ -19,6 +19,7 @@ import {
 import { useActions, useAppState } from '../store/AppStore'
 import { useChartMode } from '../store/ThemeProvider'
 import {
+  isLiquidAsset,
   monthlySeries,
   netWorthBreakdown,
   netWorthHistory,
@@ -59,10 +60,10 @@ import { hrefFor } from '../hooks/useRouter'
 import { cn } from '../lib/cn'
 
 /**
- * Milestones sit every ₹5,00,000. Round enough to feel like a landmark, close
+ * Milestones sit every $25,000. Round enough to feel like a landmark, close
  * enough together that the next one is always within reach of a real plan.
  */
-const MILESTONE_STEP = 5_00_000
+const MILESTONE_STEP = 25_000
 
 /**
  * A fixed palette slot per composition row.
@@ -134,9 +135,7 @@ export default function NetWorth() {
   const liabilityChange = percentChange(latest.liabilities, priorMonth.liabilities)
 
   const investments = useMemo(() => summariseInvestments(state.investments), [state.investments])
-  const bankAndCash = state.assets
-    .filter((asset) => asset.type === 'Bank Balance' || asset.type === 'Cash')
-    .reduce((sum, asset) => sum + asset.value, 0)
+  const bankAndCash = state.assets.filter(isLiquidAsset).reduce((sum, asset) => sum + asset.value, 0)
   // Liquid net worth deliberately excludes property, vehicles and jewellery:
   // it answers "what could I actually settle up with", not "what am I worth".
   const liquidNetWorth = bankAndCash + investments.currentValue + totalSaved(state.goals) - breakdown.totalLiabilities
@@ -178,7 +177,7 @@ export default function NetWorth() {
   /* Mutations                                                              */
   /* ---------------------------------------------------------------------- */
 
-  function saveEntry(values: { name: string; type: string; value: number }) {
+  function saveEntry(values: { name: string; type: string; value: number; institution?: string }) {
     if (!editor) return
     const previousValue = editor.entry?.value ?? 0
     // Same delta, opposite sign: an asset lifts net worth, a liability drags it.
@@ -187,7 +186,12 @@ export default function NetWorth() {
     const verb = editor.entry ? 'updated' : 'added'
 
     if (editor.kind === 'asset') {
-      const patch = { name: values.name, type: values.type as AssetType, value: values.value }
+      const patch = {
+        name: values.name,
+        type: values.type as AssetType,
+        value: values.value,
+        institution: values.institution,
+      }
       if (editor.entry) actions.updateAsset(editor.entry.id, patch)
       else actions.addAsset(patch)
     } else {
@@ -493,7 +497,7 @@ export default function NetWorth() {
       <LedgerCard
         anchorId={ASSETS_ANCHOR}
         title="Assets you keep up to date"
-        subtitle="Balances CreditCompass cannot see for itself — bank, cash, property, vehicles, gold, receivables"
+        subtitle="Balances CreditCompass cannot see for itself — chequing, savings, cash, property, vehicles"
         icon={<Wallet className="h-4 w-4" />}
         nameHeading="Asset"
         valueHeading="Value"
@@ -511,7 +515,7 @@ export default function NetWorth() {
           if (asset) setDeleteTarget({ kind: 'asset', entry: asset })
         }}
         emptyTitle="No manual assets yet"
-        emptyMessage="Your bank balance is the one number this page cannot work out on its own — add it first."
+        emptyMessage="Your chequing balance is the one number this page cannot work out on its own — add it first."
       />
 
       <LedgerCard
@@ -737,7 +741,7 @@ function SourcesCaption({ manualAssets, manualLiabilities }: { manualAssets: num
             </li>
             <li>
               <SourceLink href="/loans">Loans outstanding</SourceLink> — remaining principal from each amortisation
-              schedule, so it falls with every EMI you mark paid.
+              schedule, so it falls with every payment you record.
             </li>
             <li>
               <SourceLink href="/cards">Credit card dues</SourceLink> — unpaid statement balances; marking a bill paid
@@ -756,15 +760,15 @@ function SourcesCaption({ manualAssets, manualLiabilities }: { manualAssets: num
           </p>
           <ul className="mt-2.5 flex flex-col gap-2 text-[12.5px] leading-relaxed text-ink-secondary">
             <li>
-              <strong className="font-medium text-ink">Bank balances and cash</strong> — nothing connects to your bank,
+              <strong className="font-medium text-ink">Chequing, savings and cash</strong> — nothing connects to your bank,
               so this is the one figure worth refreshing each month.
             </li>
             <li>
-              <strong className="font-medium text-ink">Property, vehicles and gold</strong> — record today's resale
+              <strong className="font-medium text-ink">Property and vehicles</strong> — record today's resale
               value, not what you paid for it.
             </li>
             <li>
-              <strong className="font-medium text-ink">Receivables and other assets</strong> — money owed to you, or
+              <strong className="font-medium text-ink">Other assets</strong> — money owed to you, or
               anything else of value.
             </li>
             <li>
@@ -798,6 +802,7 @@ interface LedgerRow {
   id: string
   name: string
   type: string
+  institution?: string
   value: number
   updatedAt: string
 }
@@ -880,7 +885,9 @@ function LedgerCard({
               {rows.map((row) => (
                 <Tr key={row.id}>
                   <Td className="font-medium whitespace-nowrap">{row.name}</Td>
-                  <Td className="whitespace-nowrap text-ink-secondary">{row.type}</Td>
+                  <Td className="whitespace-nowrap text-ink-secondary">
+                    {row.institution ? `${row.institution} · ${row.type}` : row.type}
+                  </Td>
                   <Td align="right" className="tabular font-semibold whitespace-nowrap">
                     {formatCurrency(row.value)}
                   </Td>
@@ -930,7 +937,7 @@ function EntryFormModal({
   kind: 'asset' | 'liability'
   entry?: Asset | Liability
   onClose: () => void
-  onSave: (values: { name: string; type: string; value: number }) => void
+  onSave: (values: { name: string; type: string; value: number; institution?: string }) => void
 }) {
   // useId can contain characters that are awkward in an `id` attribute; the
   // footer button reaches this form by id, so keep it plain.
@@ -942,6 +949,8 @@ function EntryFormModal({
   const [name, setName] = useState(entry?.name ?? '')
   const [type, setType] = useState<string>(entry?.type ?? types[0])
   const [value, setValue] = useState(entry ? String(entry.value) : '')
+  // Only assets carry an institution; liabilities are described by their name.
+  const [institution, setInstitution] = useState(isAsset ? ((entry as Asset | undefined)?.institution ?? '') : '')
   // Errors stay quiet until the first submit — nobody wants to be told a field
   // is empty before they have had a chance to fill it in.
   const [submitted, setSubmitted] = useState(false)
@@ -955,7 +964,12 @@ function EntryFormModal({
     event.preventDefault()
     setSubmitted(true)
     if (nameError || valueError) return
-    onSave({ name: name.trim(), type, value: Math.round(amount * 100) / 100 })
+    onSave({
+      name: name.trim(),
+      type,
+      value: Math.round(amount * 100) / 100,
+      institution: isAsset ? institution.trim() || undefined : undefined,
+    })
   }
 
   return (
@@ -985,12 +999,26 @@ function EntryFormModal({
               id={id}
               value={name}
               autoComplete="off"
-              placeholder={isAsset ? 'HDFC savings account' : 'Borrowed from family'}
+              placeholder={isAsset ? 'CIBC Smart Account' : 'Borrowed from family'}
               invalid={submitted && Boolean(nameError)}
               onChange={(event) => setName(event.target.value)}
             />
           )}
         </Field>
+
+        {isAsset ? (
+          <Field label="Institution" hint="Optional — CIBC, Wealthsimple, Tangerine…">
+            {(id) => (
+              <TextInput
+                id={id}
+                value={institution}
+                autoComplete="off"
+                placeholder="CIBC"
+                onChange={(event) => setInstitution(event.target.value)}
+              />
+            )}
+          </Field>
+        ) : null}
 
         <Field label="Type" required>
           {(id) => (

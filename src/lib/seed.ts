@@ -2,9 +2,11 @@
  * Demo workspace.
  *
  * Built fresh on first run so the app opens with something to look at rather
- * than a wall of empty states. Figures follow the brief: ₹80,000 salary,
- * ₹25,000 rent, three SIPs (₹2,500 / ₹2,000 / ₹1,500), a ₹15,000 gold holding,
- * and an emergency fund at ₹40,000 of a ₹1,50,000 target.
+ * than a wall of empty states. The persona is deliberately the situation this
+ * app exists for: a Canadian with CIBC and Wealthsimple accounts, one credit
+ * card running hot, and an auto loan opened ten months ago that knocked the
+ * credit score down and has not let it recover — so every recommendation on the
+ * Credit Health page lights up the moment the demo loads.
  *
  * Randomness is seeded, so the same demo appears every time — reproducible
  * screenshots, and no chart that reshuffles itself between reloads.
@@ -25,15 +27,8 @@ import type {
   Transaction,
 } from '../types'
 import { DEFAULT_BUDGET_KEY } from '../types'
-import { calculateEmi, defaultSettings } from './finance'
-import {
-  addMonths,
-  clampDayToMonth,
-  currentMonthKey,
-  monthKey,
-  monthRange,
-  todayISO,
-} from './date'
+import { calculateLoanPayment, defaultSettings } from './finance'
+import { addMonths, clampDayToMonth, currentMonthKey, monthKey, monthRange, todayISO } from './date'
 import { uid } from './id'
 
 /** Deterministic PRNG so the demo data is identical on every build. */
@@ -49,8 +44,11 @@ function mulberry32(seed: number) {
 
 const HISTORY_MONTHS = 13
 
+/** How long ago the auto loan was opened — the event the demo score history pivots on. */
+export const DEMO_AUTO_LOAN_MONTHS_AGO = 10
+
 export function buildSeedState(): AppState {
-  const rand = mulberry32(20260807)
+  const rand = mulberry32(20260903)
   const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)]
   const between = (min: number, max: number) => Math.round(min + rand() * (max - min))
   const today = todayISO()
@@ -61,36 +59,21 @@ export function buildSeedState(): AppState {
   /* Loans                                                                   */
   /* ---------------------------------------------------------------------- */
 
-  const carStart = addMonths(thisMonth, -17)
-  const gadgetStart = addMonths(thisMonth, -6)
+  const autoStart = addMonths(thisMonth, -DEMO_AUTO_LOAN_MONTHS_AGO)
 
   const loans: Loan[] = [
     {
-      id: 'loan_car',
-      name: 'Car Loan',
-      lender: 'HDFC Bank',
-      type: 'Car Loan',
-      principal: 550000,
-      interestRate: 9.5,
-      emiAmount: calculateEmi(550000, 9.5, 48),
-      tenureMonths: 48,
-      paidMonths: 17,
-      startDate: `${carStart}-07`,
-      dueDay: 7,
-      active: true,
-    },
-    {
-      id: 'loan_gadget',
-      name: 'MacBook Loan',
-      lender: 'Bajaj Finserv',
-      type: 'Consumer Durable',
-      principal: 42000,
-      interestRate: 13,
-      emiAmount: calculateEmi(42000, 13, 12),
-      tenureMonths: 12,
-      paidMonths: 6,
-      startDate: `${gadgetStart}-12`,
-      dueDay: 12,
+      id: 'loan_auto',
+      name: 'Auto Loan',
+      lender: 'CIBC',
+      type: 'Auto Loan',
+      principal: 28000,
+      interestRate: 7.49,
+      paymentAmount: calculateLoanPayment(28000, 7.49, 72),
+      tenureMonths: 72,
+      paidMonths: DEMO_AUTO_LOAN_MONTHS_AGO,
+      startDate: `${autoStart}-15`,
+      dueDay: 15,
       active: true,
     },
   ]
@@ -104,18 +87,14 @@ export function buildSeedState(): AppState {
     name: string
     type: Investment['type']
     monthly?: number
-    sipDay?: number
+    day?: number
     lumpSum?: number
     startMonthsAgo: number
     growth: number
-    units?: number
   }[] = [
-    { id: 'inv_sip1', name: 'Axis Bluechip Fund', type: 'SIP', monthly: 2500, sipDay: 5, startMonthsAgo: 40, growth: 1.19 },
-    { id: 'inv_sip2', name: 'Parag Parikh Flexi Cap', type: 'SIP', monthly: 2000, sipDay: 10, startMonthsAgo: 34, growth: 1.22 },
-    { id: 'inv_sip3', name: 'Nippon India Small Cap', type: 'SIP', monthly: 1500, sipDay: 15, startMonthsAgo: 26, growth: 1.28 },
-    { id: 'inv_gold', name: 'Digital Gold (SGB)', type: 'Gold', lumpSum: 15000, startMonthsAgo: 19, growth: 1.19, units: 2.1 },
-    { id: 'inv_mf', name: 'HDFC Balanced Advantage', type: 'Mutual Fund', lumpSum: 60000, startMonthsAgo: 24, growth: 1.185 },
-    { id: 'inv_stock', name: 'Direct Equity Basket', type: 'Stock', lumpSum: 85000, startMonthsAgo: 30, growth: 0.94 },
+    { id: 'inv_tfsa', name: 'Wealthsimple TFSA', type: 'TFSA', monthly: 300, day: 2, startMonthsAgo: 30, growth: 1.14 },
+    { id: 'inv_rrsp', name: 'Wealthsimple RRSP', type: 'RRSP', monthly: 200, day: 2, startMonthsAgo: 24, growth: 1.11 },
+    { id: 'inv_gic', name: 'CIBC 1-Year GIC', type: 'GIC', lumpSum: 5000, startMonthsAgo: 8, growth: 1.03 },
   ]
 
   const investments: Investment[] = investmentSpecs.map((spec) => {
@@ -148,9 +127,8 @@ export function buildSeedState(): AppState {
       invested,
       currentValue,
       monthlyAmount: spec.monthly,
-      sipDay: spec.sipDay,
-      units: spec.units,
-      startDate: `${startMonth}-${String(spec.sipDay ?? 15).padStart(2, '0')}`,
+      contributionDay: spec.day,
+      startDate: `${startMonth}-${String(spec.day ?? 15).padStart(2, '0')}`,
       active: true,
       history,
     }
@@ -186,78 +164,81 @@ export function buildSeedState(): AppState {
     })
   }
 
-  const FOOD_NOTES = ['Groceries — BigBasket', 'Swiggy order', 'Weekend dinner', 'Zomato lunch', 'Milk & vegetables', 'Office canteen', 'Coffee run', 'Bakery']
-  const TRAVEL_NOTES = ['Uber to office', 'Metro recharge', 'Petrol', 'Ola airport drop', 'Weekend road trip', 'Train ticket']
-  const SHOPPING_NOTES = ['Amazon order', 'Myntra — clothes', 'Home essentials', 'Electronics accessory', 'Gift for family', 'Footwear']
-  const ENTERTAINMENT_NOTES = ['Netflix', 'Spotify Premium', 'Movie tickets', 'Concert tickets', 'Gaming subscription']
-  const MEDICAL_NOTES = ['Pharmacy', 'Doctor consultation', 'Lab tests', 'Dental checkup']
-  const OTHER_NOTES = ['Electricity bill', 'Mobile recharge', 'Broadband bill', 'Gas cylinder', 'Household help', 'Water bill']
-  const METHODS: PaymentMethod[] = ['UPI', 'Credit Card', 'Debit Card', 'Cash', 'Bank Transfer']
+  const FOOD_NOTES = ['No Frills groceries', 'Loblaws', 'Costco run', 'Tim Hortons', 'Uber Eats', 'Skip the Dishes', 'Dinner out', 'Farm Boy', 'Starbucks', 'Lunch near work']
+  const TRANSPORT_NOTES = ['Petro-Canada fuel', 'Shell fuel', 'PRESTO top-up', 'Parking downtown', 'Uber ride', 'Car wash']
+  const SHOPPING_NOTES = ['Amazon.ca order', 'Canadian Tire', 'Winners', 'Best Buy', 'Uniqlo', 'IKEA']
+  const ENTERTAINMENT_NOTES = ['Netflix', 'Spotify Premium', 'Cineplex tickets', 'Steam game', 'Crave', 'Concert tickets']
+  const OTHER_NOTES = ['Shoppers Drug Mart', 'Haircut', 'Gift', 'Dentist copay', 'Dry cleaning']
+  // Weighted towards the card on purpose — that is how the balance got to 61%.
+  const METHODS: PaymentMethod[] = ['Debit', 'Credit Card', 'Credit Card', 'Interac e-Transfer', 'Cash']
 
   for (const month of months) {
-    // Salary
-    add('income', 80000, 'Salary', clampDayToMonth(month, 1), 'Monthly salary credit', 'Bank Transfer')
+    // Pay
+    add('income', 5200, 'Salary', clampDayToMonth(month, 1), 'Paycheque', 'Bank Transfer')
 
     // Occasional extra income
     const m = Number(month.slice(5))
-    if (m === 3) add('income', 65000, 'Bonus', clampDayToMonth(month, 28), 'Annual performance bonus', 'Bank Transfer')
-    if (m === 10) add('income', 25000, 'Bonus', clampDayToMonth(month, 18), 'Festive bonus', 'Bank Transfer')
-    if (m % 3 === 0) add('income', between(600, 1400), 'Interest', clampDayToMonth(month, 26), 'Savings account interest', 'Bank Transfer')
-    if (m === 6) add('income', 12000, 'Freelance', clampDayToMonth(month, 21), 'Weekend design project', 'UPI')
+    if (m === 4) add('income', 1150, 'Refund', clampDayToMonth(month, 22), 'CRA tax refund', 'Bank Transfer')
+    if (m === 12) add('income', 2000, 'Bonus', clampDayToMonth(month, 20), 'Year-end bonus', 'Bank Transfer')
+    if ([1, 4, 7, 10].includes(m)) add('income', 122, 'Government Benefit', clampDayToMonth(month, 5), 'GST/HST credit', 'Bank Transfer')
+    if (m % 3 === 0) add('income', between(6, 24), 'Interest', clampDayToMonth(month, 28), 'Savings interest', 'Bank Transfer')
 
     // Rent
-    add('expense', 25000, 'Rent', clampDayToMonth(month, 3), 'Apartment rent', 'Bank Transfer')
+    add('expense', 1850, 'Rent', clampDayToMonth(month, 1), 'Rent', 'Pre-authorized Debit')
 
-    // EMIs
+    // Loan payments
     for (const loan of loans) {
       const loanStart = monthKey(loan.startDate)
       const paidThrough = addMonths(loanStart, loan.paidMonths - 1)
       if (month >= loanStart && month <= paidThrough) {
-        add('expense', loan.emiAmount, 'EMI', clampDayToMonth(month, loan.dueDay), `${loan.name} instalment`, 'Auto-debit', {
+        add('expense', loan.paymentAmount, 'Loan Payment', clampDayToMonth(month, loan.dueDay), `${loan.name} payment`, 'Pre-authorized Debit', {
           linkedType: 'loan',
           linkedId: loan.id,
         })
       }
     }
 
-    // SIP debits
+    // Recurring contributions
     for (const inv of investments) {
       if (!inv.monthlyAmount) continue
       if (month >= monthKey(inv.startDate)) {
-        add('expense', inv.monthlyAmount, 'Investments', clampDayToMonth(month, inv.sipDay ?? 5), `${inv.name} SIP`, 'Auto-debit', {
+        add('expense', inv.monthlyAmount, 'Investments', clampDayToMonth(month, inv.contributionDay ?? 1), `${inv.name} contribution`, 'Pre-authorized Debit', {
           linkedType: 'investment',
           linkedId: inv.id,
         })
       }
     }
 
-    // Gold purchase, once
-    const goldMonth = monthKey(investments.find((i) => i.id === 'inv_gold')!.startDate)
-    if (month === goldMonth) {
-      add('expense', 15000, 'Investments', clampDayToMonth(month, 15), 'Sovereign Gold Bond purchase', 'Bank Transfer', {
+    // GIC purchase, once
+    const gicMonth = monthKey(investments.find((i) => i.id === 'inv_gic')!.startDate)
+    if (month === gicMonth) {
+      add('expense', 5000, 'Investments', clampDayToMonth(month, 15), 'CIBC GIC purchase', 'Bank Transfer', {
         linkedType: 'investment',
-        linkedId: 'inv_gold',
+        linkedId: 'inv_gic',
       })
     }
 
+    // Fixed bills
+    add('expense', 75, 'Bills & Utilities', clampDayToMonth(month, 8), 'Rogers mobile', 'Pre-authorized Debit')
+    add('expense', 70, 'Bills & Utilities', clampDayToMonth(month, 20), 'Bell internet', 'Pre-authorized Debit')
+    add('expense', between(55, 115), 'Bills & Utilities', clampDayToMonth(month, 22), 'Toronto Hydro', 'Pre-authorized Debit')
+    add('expense', 165, 'Bills & Utilities', clampDayToMonth(month, 12), 'Intact car insurance', 'Pre-authorized Debit')
+
     // Variable spend
-    for (let i = 0; i < between(6, 8); i++) {
-      add('expense', between(180, 2400), 'Food', clampDayToMonth(month, between(1, 28)), pick(FOOD_NOTES), pick(METHODS))
+    for (let i = 0; i < between(8, 12); i++) {
+      add('expense', between(12, 140), 'Food & Dining', clampDayToMonth(month, between(1, 28)), pick(FOOD_NOTES), pick(METHODS))
     }
-    for (let i = 0; i < between(2, 4); i++) {
-      add('expense', between(160, 1800), 'Travel', clampDayToMonth(month, between(1, 28)), pick(TRAVEL_NOTES), pick(METHODS))
-    }
-    for (let i = 0; i < between(1, 3); i++) {
-      add('expense', between(700, 3800), 'Shopping', clampDayToMonth(month, between(1, 28)), pick(SHOPPING_NOTES), 'Credit Card')
+    for (let i = 0; i < between(3, 5); i++) {
+      add('expense', between(35, 95), 'Transport', clampDayToMonth(month, between(1, 28)), pick(TRANSPORT_NOTES), pick(METHODS))
     }
     for (let i = 0; i < between(1, 3); i++) {
-      add('expense', between(119, 1400), 'Entertainment', clampDayToMonth(month, between(1, 28)), pick(ENTERTAINMENT_NOTES), pick(METHODS))
+      add('expense', between(30, 220), 'Shopping', clampDayToMonth(month, between(1, 28)), pick(SHOPPING_NOTES), 'Credit Card')
     }
-    if (rand() > 0.45) {
-      add('expense', between(400, 2600), 'Medical', clampDayToMonth(month, between(1, 28)), pick(MEDICAL_NOTES), pick(METHODS))
+    for (let i = 0; i < between(1, 3); i++) {
+      add('expense', between(12, 80), 'Entertainment', clampDayToMonth(month, between(1, 28)), pick(ENTERTAINMENT_NOTES), pick(METHODS))
     }
-    for (let i = 0; i < 3; i++) {
-      add('expense', between(400, 2400), 'Other', clampDayToMonth(month, between(2, 26)), pick(OTHER_NOTES), pick(METHODS))
+    for (let i = 0; i < between(0, 2); i++) {
+      add('expense', between(20, 150), 'Other', clampDayToMonth(month, between(2, 26)), pick(OTHER_NOTES), pick(METHODS))
     }
   }
 
@@ -266,10 +247,9 @@ export function buildSeedState(): AppState {
   /* ---------------------------------------------------------------------- */
 
   const goals: SavingsGoal[] = [
-    makeGoal('goal_emergency', 'Emergency Fund', 150000, 40000, 'shield', 5000, addMonths(thisMonth, 22), true),
-    makeGoal('goal_vacation', 'Vacation — Bali', 120000, 34000, 'plane', 2500, addMonths(thisMonth, 10)),
-    makeGoal('goal_laptop', 'New Laptop', 140000, 52000, 'laptop', 3000, addMonths(thisMonth, 15)),
-    makeGoal('goal_house', 'House Down Payment', 1500000, 210000, 'home', 5000, addMonths(thisMonth, 48)),
+    makeGoal('goal_emergency', 'Emergency Fund', 15000, 4200, 'shield', 300, addMonths(thisMonth, 36), true),
+    makeGoal('goal_vacation', 'Vancouver trip', 3000, 900, 'plane', 150, addMonths(thisMonth, 10)),
+    makeGoal('goal_laptop', 'New laptop', 2500, 1100, 'laptop', 100, addMonths(thisMonth, 12)),
   ]
 
   function makeGoal(
@@ -316,41 +296,30 @@ export function buildSeedState(): AppState {
   /* Cards, assets, liabilities                                              */
   /* ---------------------------------------------------------------------- */
 
+  // One card, running at 61% of its limit — the single biggest thing holding
+  // the demo score down, and the first recommendation the app will make.
   const cards: CreditCard[] = [
     {
-      id: 'card_hdfc',
-      name: 'HDFC Millennia',
-      issuer: 'HDFC Bank',
+      id: 'card_cibc',
+      name: 'CIBC Dividend Visa',
+      issuer: 'CIBC',
       last4: '4821',
-      creditLimit: 300000,
-      outstanding: 18420,
-      minimumDue: 921,
+      creditLimit: 8000,
+      outstanding: 4880,
+      minimumDue: 120,
       statementDay: 25,
-      billDueDay: 15,
-    },
-    {
-      id: 'card_axis',
-      name: 'Axis Ace',
-      issuer: 'Axis Bank',
-      last4: '7734',
-      creditLimit: 150000,
-      outstanding: 6280,
-      minimumDue: 314,
-      statementDay: 20,
-      billDueDay: 8,
+      billDueDay: 18,
     },
   ]
 
   const assets: Asset[] = [
-    { id: 'asset_bank', name: 'HDFC Savings Account', type: 'Bank Balance', value: 185000, updatedAt: today },
-    { id: 'asset_cash', name: 'Cash in hand', type: 'Cash', value: 8500, updatedAt: today },
-    { id: 'asset_car', name: 'Hyundai i20 (resale)', type: 'Vehicle', value: 620000, updatedAt: today },
-    { id: 'asset_jewel', name: 'Family jewellery', type: 'Gold & Jewellery', value: 240000, updatedAt: today },
+    { id: 'asset_cibc_chq', name: 'CIBC Smart Account', type: 'Chequing', institution: 'CIBC', value: 3240, updatedAt: today },
+    { id: 'asset_cibc_sav', name: 'CIBC eAdvantage Savings', type: 'Savings', institution: 'CIBC', value: 6500, updatedAt: today },
+    { id: 'asset_ws_cash', name: 'Wealthsimple Cash', type: 'Chequing', institution: 'Wealthsimple', value: 2150, updatedAt: today },
+    { id: 'asset_car', name: 'Honda Civic (resale)', type: 'Vehicle', value: 24000, updatedAt: today },
   ]
 
-  const liabilities: Liability[] = [
-    { id: 'liab_family', name: 'Borrowed from family', type: 'Personal Debt', value: 30000, updatedAt: today },
-  ]
+  const liabilities: Liability[] = []
 
   /* ---------------------------------------------------------------------- */
   /* Budgets                                                                 */
@@ -358,15 +327,15 @@ export function buildSeedState(): AppState {
 
   const budgets: BudgetsByMonth = {
     [DEFAULT_BUDGET_KEY]: {
-      Rent: 25000,
-      Food: 12000,
-      Travel: 4000,
-      Shopping: 5000,
-      EMI: 18000,
-      Investments: 6000,
-      Medical: 3000,
-      Entertainment: 3000,
-      Other: 3000,
+      Rent: 1850,
+      'Food & Dining': 700,
+      Transport: 420,
+      Shopping: 250,
+      'Loan Payment': 500,
+      Investments: 500,
+      'Bills & Utilities': 400,
+      Entertainment: 120,
+      Other: 150,
     },
   }
 

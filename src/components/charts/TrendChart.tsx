@@ -31,7 +31,7 @@ export interface TrendChartProps {
   yTickFormat?: (value: number) => string
   /** Horizontal marker, e.g. an average or a target. */
   reference?: { value: number; label: string }
-  /** Extra tooltip line, e.g. "Net +₹12,400". */
+  /** Extra tooltip line, e.g. "Net +$1,240". */
   renderTooltipFooter?: (payload: readonly TooltipItem[]) => React.ReactNode
   stacked?: boolean
 }

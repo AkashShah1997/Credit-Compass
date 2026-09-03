@@ -229,7 +229,7 @@ function SalaryDay() {
             )}
           </div>
           <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
-            Dues are drawn from your loans, active SIPs, card bills and the most recent rent payment.
+            Dues are drawn from your loans, recurring contributions, card bills and the most recent rent payment.
           </p>
         </Card>
 
@@ -285,7 +285,7 @@ function SalaryDay() {
             compact
             icon={<PiggyBank className="h-5 w-5" />}
             title="Nothing is claimed yet"
-            message="No EMIs, SIPs, card bills or goal contributions are on file, so the whole pay-cheque is discretionary."
+            message="No loan payments, recurring contributions, card bills or goal contributions are on file, so the whole paycheque is discretionary."
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <Button size="sm" variant="primary" onClick={() => (window.location.hash = '#/savings')}>
@@ -472,7 +472,7 @@ function CashFlow() {
         <StatTile
           label="Committed each month"
           value={formatCurrency(first.committed)}
-          sub="Rent, EMIs and active SIPs — known to the rupee"
+          sub="Rent, loan payments and recurring contributions — known to the dollar"
           icon={<Landmark className="h-4 w-4" />}
           accent={flow.expense}
         />
@@ -532,7 +532,7 @@ function CashFlow() {
           ]),
         }}
         empty={hasData ? undefined : emptyState}
-        footnote="Committed outflows are exact: rent is your latest recorded payment, EMIs come from active loans and SIPs from active investments. Variable spend is the trailing six-month average of everything else, so an unusual month ahead will not show up here. Income assumes your salary stays flat."
+        footnote="Committed outflows are exact: rent is your latest recorded payment, loan payments come from active loans and contributions from active investments. Variable spend is the trailing six-month average of everything else, so an unusual month ahead will not show up here. Income assumes your pay stays flat."
       >
         <ColumnChart
           data={chartData}
@@ -676,7 +676,7 @@ function Independence() {
   const [confirmReset, setConfirmReset] = useState(false)
 
   const errors = {
-    monthlyInvestment: numberError(draft.monthlyInvestment, 0, 1e9, 'Enter ₹0 or more'),
+    monthlyInvestment: numberError(draft.monthlyInvestment, 0, 1e9, 'Enter $0 or more'),
     returnRate: numberError(draft.returnRate, 0, 40, 'Use a rate between 0% and 40%'),
     monthlyExpenses: numberError(draft.monthlyExpenses, 1, 1e9, 'Enter what a month of life costs'),
   }
@@ -941,7 +941,7 @@ function Independence() {
               compact
               icon={<TrendingUp className="h-5 w-5" />}
               title="Nothing to compound yet"
-              message="With no corpus and no monthly investment there is no curve to draw. Start a SIP or a savings goal and it appears here."
+              message="With no corpus and no monthly investment there is no curve to draw. Start a recurring contribution or a savings goal and it appears here."
               action={
                 <Button size="sm" variant="primary" onClick={() => (window.location.hash = '#/investments')}>
                   Start investing

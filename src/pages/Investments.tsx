@@ -64,8 +64,8 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'name', label: 'Name' },
 ]
 
-/** A SIP with no explicit debit day still has to land somewhere on the calendar. */
-const DEFAULT_SIP_DAY = 5
+/** A contribution with no explicit debit day still has to land somewhere on the calendar. */
+const DEFAULT_CONTRIBUTION_DAY = 1
 
 export default function Investments() {
   const state = useAppState()
@@ -104,19 +104,14 @@ export default function Investments() {
     })
   }, [investments, typeFilter, sort])
 
-  const sips = useMemo(
+  const recurring = useMemo(
     () =>
       investments
         .filter((inv) => inv.active && (inv.monthlyAmount ?? 0) > 0)
-        .map((inv) => ({ inv, day: inv.sipDay ?? DEFAULT_SIP_DAY }))
+        .map((inv) => ({ inv, day: inv.contributionDay ?? DEFAULT_CONTRIBUTION_DAY }))
         .sort((a, b) => a.day - b.day || a.inv.name.localeCompare(b.inv.name)),
     [investments],
   )
-
-  const gold = useMemo(() => investments.filter((inv) => inv.type === 'Gold'), [investments])
-  const goldUnits = gold.reduce((sum, inv) => sum + (inv.units ?? 0), 0)
-  const goldValue = gold.reduce((sum, inv) => sum + inv.currentValue, 0)
-  const goldInvested = gold.reduce((sum, inv) => sum + inv.invested, 0)
 
   const growthData = growth.map((row) => ({
     label: monthShort(row.month),
@@ -130,7 +125,7 @@ export default function Investments() {
     color: investmentColor(row.type, mode),
   }))
 
-  const nextSipDate = sips.length ? sips.map((s) => nextDueDate(s.day)).sort()[0] : null
+  const nextContributionDate = recurring.length ? recurring.map((s) => nextDueDate(s.day)).sort()[0] : null
 
   function handleDelete() {
     if (!pendingDelete) return
@@ -195,11 +190,11 @@ export default function Investments() {
           accent={summary.gain >= 0 ? valueColor : investedColor}
         />
         <StatTile
-          label="Monthly SIP outflow"
-          value={formatCurrency(summary.monthlySip)}
+          label="Monthly contributions"
+          value={formatCurrency(summary.monthlyContribution)}
           sub={
-            nextSipDate
-              ? `${sips.length} active SIP${sips.length === 1 ? '' : 's'} · next debit ${relativeDay(nextSipDate)}`
+            nextContributionDate
+              ? `${recurring.length} recurring contribution${recurring.length === 1 ? '' : 's'} · next debit ${relativeDay(nextContributionDate)}`
               : 'No recurring instalments set up'
           }
           icon={<CalendarClock className="h-4 w-4" />}
@@ -234,7 +229,7 @@ export default function Investments() {
                 compact
                 icon={<LineChart className="h-5 w-5" />}
                 title="Nothing invested yet"
-                message="Add your first SIP, fund or stock to start plotting growth."
+                message="Add your first TFSA, RRSP or GIC to start plotting growth."
                 action={
                   <Button size="sm" variant="primary" onClick={() => setFormFor({ investment: null })}>
                     Add investment
@@ -284,42 +279,6 @@ export default function Investments() {
         </ChartFrame>
       </div>
 
-      {gold.length > 0 ? (
-        <Card className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-              style={{
-                backgroundColor: `color-mix(in oklab, ${investmentColor('Gold', mode)} 14%, transparent)`,
-                color: investmentColor('Gold', mode),
-              }}
-            >
-              <Coins className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <p className="min-w-0 text-[13.5px] text-ink">
-              <span className="font-medium">Gold</span>
-              <span className="text-ink-secondary">
-                {' · '}
-                {gold.length} holding{gold.length === 1 ? '' : 's'}
-                {goldUnits > 0 ? ` · ${formatNumber(goldUnits, true)} units` : ''} · worth{' '}
-                <span className="tabular font-medium text-ink">{formatCurrency(goldValue)}</span> today
-              </span>
-            </p>
-          </div>
-          <span
-            className={cn(
-              'tabular shrink-0 text-[13.5px] font-semibold',
-              goldValue - goldInvested >= 0 ? 'text-positive' : 'text-negative',
-            )}
-          >
-            {formatSignedCurrency(goldValue - goldInvested)}
-            <span className="ml-1.5 text-[12px] font-normal text-muted">
-              on {formatCurrency(goldInvested)} invested
-            </span>
-          </span>
-        </Card>
-      ) : null}
-
       <Card>
         <CardHeader
           title="Holdings"
@@ -357,7 +316,7 @@ export default function Investments() {
             className="mt-4"
             icon={<TrendingUp className="h-5 w-5" />}
             title="Your portfolio is empty"
-            message="Track SIPs, mutual funds, stocks, gold and deposits together so you always know what your money is worth."
+            message="Track your TFSA, RRSP, FHSA, GICs and other holdings together so you always know what your money is worth."
             action={
               <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setFormFor({ investment: null })}>
                 Add investment
@@ -387,7 +346,7 @@ export default function Investments() {
                   <Th align="right">Current value</Th>
                   <Th align="right">Gain / loss</Th>
                   <Th align="right">Return</Th>
-                  <Th align="right">Monthly SIP</Th>
+                  <Th align="right">Monthly contribution</Th>
                   <Th align="right">Started</Th>
                   <Th align="right">Actions</Th>
                 </tr>
@@ -498,7 +457,7 @@ export default function Investments() {
         )}
       </Card>
 
-      <SipCalendar sips={sips} total={summary.monthlySip} onAdd={() => setFormFor({ investment: null })} />
+      <ContributionCalendar recurring={recurring} total={summary.monthlyContribution} onAdd={() => setFormFor({ investment: null })} />
 
       {formFor ? (
         <InvestmentFormModal
@@ -576,7 +535,7 @@ function HoldingCard({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[11.5px] text-muted">Monthly SIP</p>
+          <p className="text-[11.5px] text-muted">Monthly contribution</p>
           <p className="tabular text-[13.5px] text-ink-secondary">
             {investment.monthlyAmount ? formatCurrency(investment.monthlyAmount) : '—'}
           </p>
@@ -599,15 +558,15 @@ function HoldingCard({
 }
 
 /* -------------------------------------------------------------------------- */
-/* SIP calendar                                                               */
+/* Contribution calendar                                                      */
 /* -------------------------------------------------------------------------- */
 
-function SipCalendar({
-  sips,
+function ContributionCalendar({
+  recurring,
   total,
   onAdd,
 }: {
-  sips: { inv: Investment; day: number }[]
+  recurring: { inv: Investment; day: number }[]
   total: number
   onAdd: () => void
 }) {
@@ -616,11 +575,11 @@ function SipCalendar({
   return (
     <Card>
       <CardHeader
-        title="SIP calendar"
-        subtitle="Every recurring instalment, in the order it debits"
+        title="Contribution calendar"
+        subtitle="Every recurring contribution, in the order it debits"
         icon={<CalendarClock className="h-4 w-4" />}
         action={
-          sips.length ? (
+          recurring.length ? (
             <span className="text-right">
               <span className="tabular block text-[15px] font-semibold text-ink">{formatCurrency(total)}</span>
               <span className="block text-[11.5px] text-muted">per month</span>
@@ -629,22 +588,22 @@ function SipCalendar({
         }
       />
 
-      {sips.length === 0 ? (
+      {recurring.length === 0 ? (
         <EmptyState
           className="mt-4"
           compact
           icon={<CalendarClock className="h-5 w-5" />}
-          title="No SIPs running"
+          title="No recurring contributions"
           message="Add a holding with a monthly amount and it will show up here with its debit date."
           action={
             <Button size="sm" variant="primary" onClick={onAdd}>
-              Add a SIP
+              Add a contribution
             </Button>
           }
         />
       ) : (
         <ul className="mt-2 divide-y divide-hairline">
-          {sips.map(({ inv, day }) => {
+          {recurring.map(({ inv, day }) => {
             const due = nextDueDate(day)
             const relative = relativeDay(due)
             const soon = relative === 'today' || relative === 'tomorrow'
@@ -680,9 +639,9 @@ function SipCalendar({
         </ul>
       )}
 
-      {sips.length > 0 ? (
+      {recurring.length > 0 ? (
         <p className="mt-3 text-[11.5px] text-muted">
-          Debit days are clamped to shorter months — a 31st SIP lands on the 30th in April.
+          Debit days are clamped to shorter months — a 31st contribution lands on the 30th in April.
         </p>
       ) : null}
     </Card>
@@ -729,7 +688,7 @@ interface FormState {
   invested: string
   currentValue: string
   monthlyAmount: string
-  sipDay: string
+  contributionDay: string
   units: string
   startDate: string
   active: boolean
@@ -749,11 +708,11 @@ function InvestmentFormModal({
   // Mounted only while open, so this initialiser doubles as the reset.
   const [form, setForm] = useState<FormState>(() => ({
     name: investment?.name ?? '',
-    type: investment?.type ?? 'SIP',
+    type: investment?.type ?? 'TFSA',
     invested: investment ? String(investment.invested) : '',
     currentValue: investment ? String(investment.currentValue) : '',
     monthlyAmount: investment?.monthlyAmount ? String(investment.monthlyAmount) : '',
-    sipDay: String(investment?.sipDay ?? DEFAULT_SIP_DAY),
+    contributionDay: String(investment?.contributionDay ?? DEFAULT_CONTRIBUTION_DAY),
     units: investment?.units ? String(investment.units) : '',
     startDate: investment?.startDate ?? todayISO(),
     active: investment?.active ?? true,
@@ -761,7 +720,9 @@ function InvestmentFormModal({
   }))
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
 
-  const isSip = form.type === 'SIP'
+  // A contribution is opt-in for any account type: a TFSA topped up on payday, a
+  // GIC never. Leaving the amount blank means a one-off holding.
+  const hasContribution = form.monthlyAmount.trim() !== ''
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -781,11 +742,11 @@ function InvestmentFormModal({
     // A holding cannot begin in the future — that would put a snapshot ahead of
     // today and bend the growth chart.
     else if (form.startDate > todayISO()) next.startDate = 'Start date cannot be in the future'
-    if (isSip) {
+    if (hasContribution) {
       const monthly = toNumber(form.monthlyAmount)
-      if (!Number.isFinite(monthly) || monthly <= 0) next.monthlyAmount = 'A SIP needs a monthly amount'
-      const day = toNumber(form.sipDay)
-      if (!Number.isFinite(day) || day < 1 || day > 28) next.sipDay = 'Pick a day between 1 and 28'
+      if (!Number.isFinite(monthly) || monthly <= 0) next.monthlyAmount = 'Enter an amount above zero, or leave it blank'
+      const day = toNumber(form.contributionDay)
+      if (!Number.isFinite(day) || day < 1 || day > 28) next.contributionDay = 'Pick a day between 1 and 28'
     }
     if (form.units.trim()) {
       const units = toNumber(form.units)
@@ -805,8 +766,8 @@ function InvestmentFormModal({
       type: form.type,
       invested,
       currentValue,
-      monthlyAmount: isSip ? toNumber(form.monthlyAmount) : undefined,
-      sipDay: isSip ? Math.round(toNumber(form.sipDay)) : undefined,
+      monthlyAmount: hasContribution ? toNumber(form.monthlyAmount) : undefined,
+      contributionDay: hasContribution ? Math.round(toNumber(form.contributionDay)) : undefined,
       units,
       startDate: form.startDate,
       active: form.active,
@@ -834,7 +795,7 @@ function InvestmentFormModal({
       description={
         investment
           ? 'Changes are reflected in this month’s snapshot.'
-          : 'Track a SIP, fund, stock, deposit or anything else you own.'
+          : 'Track a TFSA, RRSP, GIC or anything else you own.'
       }
       footer={
         <>
@@ -852,7 +813,7 @@ function InvestmentFormModal({
               id={id}
               value={form.name}
               invalid={Boolean(errors.name)}
-              placeholder="e.g. Parag Parikh Flexi Cap"
+              placeholder="e.g. Wealthsimple TFSA"
               onChange={(event) => set('name', event.target.value)}
             />
           )}
@@ -924,42 +885,41 @@ function InvestmentFormModal({
           )}
         </Field>
 
-        {/* SIP mechanics only make sense for a SIP — everything else is a lump sum. */}
-        {isSip ? (
-          <>
-            <Field label="Monthly amount" required error={errors.monthlyAmount}>
-              {(id) => (
-                <CurrencyInput
-                  id={id}
-                  value={form.monthlyAmount}
-                  invalid={Boolean(errors.monthlyAmount)}
-                  placeholder="5000"
-                  onChange={(event) => set('monthlyAmount', event.target.value)}
-                />
-              )}
-            </Field>
+        <Field
+          label="Monthly contribution"
+          error={errors.monthlyAmount}
+          hint="Optional — leave blank for a one-off holding"
+        >
+          {(id) => (
+            <CurrencyInput
+              id={id}
+              value={form.monthlyAmount}
+              invalid={Boolean(errors.monthlyAmount)}
+              placeholder="0"
+              onChange={(event) => set('monthlyAmount', event.target.value)}
+            />
+          )}
+        </Field>
 
-            <Field
-              label="Debit day"
-              required
-              error={errors.sipDay}
-              hint="1–28, so the date exists in every month"
-            >
-              {(id) => (
-                <TextInput
-                  id={id}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={28}
-                  value={form.sipDay}
-                  invalid={Boolean(errors.sipDay)}
-                  onChange={(event) => set('sipDay', event.target.value)}
-                />
-              )}
-            </Field>
-          </>
-        ) : null}
+        <Field
+          label="Debit day"
+          error={errors.contributionDay}
+          hint="1–28, so the date exists in every month"
+        >
+          {(id) => (
+            <TextInput
+              id={id}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={28}
+              value={form.contributionDay}
+              invalid={Boolean(errors.contributionDay)}
+              disabled={!hasContribution}
+              onChange={(event) => set('contributionDay', event.target.value)}
+            />
+          )}
+        </Field>
 
         <Field label="Units" error={errors.units} hint="Optional — grams, shares or fund units">
           {(id) => (
@@ -983,7 +943,7 @@ function InvestmentFormModal({
             checked={form.active}
             onChange={(next) => set('active', next)}
             label="Active"
-            description="Paused holdings stay in the portfolio but drop out of the SIP calendar and monthly outflow."
+            description="Paused holdings stay in the portfolio but drop out of the contribution calendar and monthly outflow."
           />
         </div>
 

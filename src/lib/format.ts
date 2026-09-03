@@ -1,52 +1,53 @@
 /**
  * Number and currency formatting.
  *
- * The app is rupee-denominated, so grouping follows the Indian system
- * (₹1,50,000 — not ₹150,000) and compact figures use lakh/crore rather than
- * K/M. `Intl` handles both once you ask it for the `en-IN` locale.
+ * The app is Canadian-dollar denominated: `en-CA` grouping ($1,500,000) and
+ * compact figures on the thousand/million scale ($4.9K, $1.2M). `Intl` handles
+ * the locale once you ask it for `en-CA`, which also gives the plain `$` sign
+ * rather than the disambiguating `CA$` other locales print.
  */
 
-const inr0 = new Intl.NumberFormat('en-IN', {
+const cad0 = new Intl.NumberFormat('en-CA', {
   style: 'currency',
-  currency: 'INR',
+  currency: 'CAD',
   maximumFractionDigits: 0,
 })
 
-const inr2 = new Intl.NumberFormat('en-IN', {
+const cad2 = new Intl.NumberFormat('en-CA', {
   style: 'currency',
-  currency: 'INR',
+  currency: 'CAD',
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 })
 
-const plain0 = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })
-const plain2 = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 })
+const plain0 = new Intl.NumberFormat('en-CA', { maximumFractionDigits: 0 })
+const plain2 = new Intl.NumberFormat('en-CA', { maximumFractionDigits: 2 })
 
-export const CURRENCY_SYMBOL = '₹'
+export const CURRENCY_SYMBOL = '$'
 
-/** `80000` → `₹80,000`. Pass `decimals` for paise. */
+/** `5200` → `$5,200`. Pass `decimals` for cents. */
 export function formatCurrency(value: number, decimals = false): string {
   if (!Number.isFinite(value)) return '—'
-  return (decimals ? inr2 : inr0).format(value)
+  return (decimals ? cad2 : cad0).format(value)
 }
 
-/** Signed for deltas: `+₹12,000` / `−₹3,400`. Uses a true minus sign. */
+/** Signed for deltas: `+$1,200` / `−$340`. Uses a true minus sign. */
 export function formatSignedCurrency(value: number, decimals = false): string {
   if (!Number.isFinite(value)) return '—'
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
-  return `${sign}${(decimals ? inr2 : inr0).format(Math.abs(value))}`
+  return `${sign}${(decimals ? cad2 : cad0).format(Math.abs(value))}`
 }
 
 /**
- * Compact rupees on the Indian scale: `₹1.5L`, `₹2.4Cr`, `₹80K`.
+ * Compact dollars: `$4.9K`, `$1.2M`, `$850`.
  * Used for axis ticks and stat tiles where the exact figure lives in a tooltip.
  */
 export function formatCompactCurrency(value: number): string {
   if (!Number.isFinite(value)) return '—'
   const sign = value < 0 ? '−' : ''
   const abs = Math.abs(value)
-  if (abs >= 1_00_00_000) return `${sign}${CURRENCY_SYMBOL}${trim(abs / 1_00_00_000)}Cr`
-  if (abs >= 1_00_000) return `${sign}${CURRENCY_SYMBOL}${trim(abs / 1_00_000)}L`
+  if (abs >= 1_000_000_000) return `${sign}${CURRENCY_SYMBOL}${trim(abs / 1_000_000_000)}B`
+  if (abs >= 1_000_000) return `${sign}${CURRENCY_SYMBOL}${trim(abs / 1_000_000)}M`
   if (abs >= 1_000) return `${sign}${CURRENCY_SYMBOL}${trim(abs / 1_000)}K`
   return `${sign}${CURRENCY_SYMBOL}${plain0.format(abs)}`
 }
@@ -115,15 +116,14 @@ export function initials(name: string): string {
     .join('')
 }
 
-/** Parse loosely-typed user input ("₹1,20,000" / "1.2k") into a number. */
+/** Parse loosely-typed user input ("$1,200" / "1.2k" / "2m") into a number. */
 export function parseAmount(input: string): number {
-  const cleaned = input.replace(/[^\d.kKlLcC]/g, '')
-  const match = /^([\d.]+)\s*([klc]{0,2})$/i.exec(cleaned)
+  const cleaned = input.replace(/[^\d.kKmM]/g, '')
+  const match = /^([\d.]+)\s*([km]?)$/i.exec(cleaned)
   if (!match) return Number(input.replace(/[^\d.-]/g, '')) || 0
   const base = Number(match[1]) || 0
   const suffix = match[2].toLowerCase()
   if (suffix === 'k') return base * 1_000
-  if (suffix === 'l') return base * 1_00_000
-  if (suffix === 'c' || suffix === 'cr') return base * 1_00_00_000
+  if (suffix === 'm') return base * 1_000_000
   return base
 }

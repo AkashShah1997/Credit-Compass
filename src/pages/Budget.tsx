@@ -46,8 +46,8 @@ import { ColumnChart } from '../components/charts/ColumnChart'
 import { hrefFor } from '../hooks/useRouter'
 import { cn } from '../lib/cn'
 
-/** Nobody budgets a category above a crore a month; past that it is a typo. */
-const MAX_LIMIT = 1_00_00_000
+/** Nobody budgets a category above a million dollars a month; past that it is a typo. */
+const MAX_LIMIT = 1_000_000
 
 /**
  * One shared column template for the header, every editor row and the totals
@@ -142,9 +142,9 @@ export default function Budget() {
     const next: BudgetLimits = {}
     for (const category of EXPENSE_CATEGORIES) {
       const average = (totals.get(category) ?? 0) / activeMonths.size
-      // Round *up* to the nearest ₹100: a limit that rounds down is one you
+      // Round *up* to the nearest $10: a limit that rounds down is one you
       // break on day one.
-      if (average > 0) next[category] = Math.ceil(average / 100) * 100
+      if (average > 0) next[category] = Math.ceil(average / 10) * 10
     }
     return Object.keys(next).length > 0 ? { limits: next, months: activeMonths.size } : null
   }, [state.transactions, month])
@@ -592,7 +592,7 @@ export default function Budget() {
           <span className="text-[13px] font-semibold text-ink">Total</span>
           <span className="flex items-center justify-between sm:block sm:pl-3">
             <span className="text-[11.5px] text-muted sm:hidden">Budgeted</span>
-            {/* pl-3 lines the ₹ up with the one inside the inputs above. */}
+            {/* pl-3 lines the $ up with the one inside the inputs above. */}
             <span className="tabular text-[13px] font-semibold text-ink">{formatCurrency(summary.totalLimit)}</span>
           </span>
           <span className="flex items-center justify-between sm:block sm:text-right">
@@ -729,7 +729,7 @@ function BudgetRowEditor({
       return
     }
     if (value > MAX_LIMIT) {
-      setError('That is above the ₹1 crore ceiling')
+      setError('That is above the $1 million ceiling')
       return
     }
     setError(null)

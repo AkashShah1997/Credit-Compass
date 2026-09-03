@@ -43,10 +43,10 @@ function initialState(transaction: Transaction | null | undefined, defaults: { t
   return {
     type: defaults.type,
     amount: '',
-    category: defaults.category ?? (defaults.type === 'income' ? 'Salary' : 'Food'),
+    category: defaults.category ?? (defaults.type === 'income' ? 'Salary' : 'Food & Dining'),
     date: todayISO(),
     note: '',
-    method: defaults.type === 'income' ? 'Bank Transfer' : 'UPI',
+    method: defaults.type === 'income' ? 'Bank Transfer' : 'Debit',
   }
 }
 
@@ -220,7 +220,7 @@ export function TransactionFormModal({
             <TextInput
               id={id}
               value={form.note}
-              placeholder="e.g. Groceries at BigBasket"
+              placeholder="e.g. Groceries at No Frills"
               maxLength={80}
               onChange={(event) => set('note', event.target.value)}
               onKeyDown={(event) => {

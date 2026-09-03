@@ -60,7 +60,7 @@ type Action =
   | { type: 'loan/add'; loan: Loan }
   | { type: 'loan/update'; id: string; patch: Partial<Loan> }
   | { type: 'loan/remove'; id: string }
-  | { type: 'loan/payEmi'; id: string }
+  | { type: 'loan/recordPayment'; id: string }
   | { type: 'card/add'; card: CreditCard }
   | { type: 'card/update'; id: string; patch: Partial<CreditCard> }
   | { type: 'card/remove'; id: string }
@@ -183,7 +183,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'loan/remove':
       return { ...state, loans: state.loans.filter((l) => l.id !== action.id) }
 
-    case 'loan/payEmi': {
+    case 'loan/recordPayment': {
       const loan = state.loans.find((l) => l.id === action.id)
       if (!loan || loan.paidMonths >= loan.tenureMonths) return state
       const schedule = amortisationSchedule(loan)
@@ -192,11 +192,11 @@ function reducer(state: AppState, action: Action): AppState {
       const transaction: Transaction = {
         id: uid('txn'),
         type: 'expense',
-        amount: row?.emi ?? loan.emiAmount,
-        category: 'EMI',
+        amount: row?.payment ?? loan.paymentAmount,
+        category: 'Loan Payment',
         date: todayISO(),
-        note: `${loan.name} instalment ${paidMonths}/${loan.tenureMonths}`,
-        method: 'Auto-debit',
+        note: `${loan.name} payment ${paidMonths}/${loan.tenureMonths}`,
+        method: 'Pre-authorized Debit',
         linkedType: 'loan',
         linkedId: loan.id,
         createdAt: new Date().toISOString(),
@@ -305,7 +305,7 @@ export interface AppActions {
   addLoan: (input: Omit<Loan, 'id'>) => void
   updateLoan: (id: string, patch: Partial<Loan>) => void
   removeLoan: (id: string) => void
-  payEmi: (id: string) => void
+  recordLoanPayment: (id: string) => void
 
   addCard: (input: Omit<CreditCard, 'id'>) => void
   updateCard: (id: string, patch: Partial<CreditCard>) => void
@@ -414,7 +414,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       addLoan: (input) => dispatch({ type: 'loan/add', loan: { ...input, id: uid('loan') } }),
       updateLoan: (id, patch) => dispatch({ type: 'loan/update', id, patch }),
       removeLoan: (id) => dispatch({ type: 'loan/remove', id }),
-      payEmi: (id) => dispatch({ type: 'loan/payEmi', id }),
+      recordLoanPayment: (id) => dispatch({ type: 'loan/recordPayment', id }),
 
       addCard: (input) => dispatch({ type: 'card/add', card: { ...input, id: uid('card') } }),
       updateCard: (id, patch) => dispatch({ type: 'card/update', id, patch }),

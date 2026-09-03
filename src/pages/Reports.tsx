@@ -1225,9 +1225,8 @@ function ExportPanel({
         })}
       </div>
       <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
-        PDF figures print as <span className="font-medium text-ink-secondary">Rs.</span> rather than ₹ — the
-        PDF core fonts carry no rupee glyph, and substituting one would garble every amount. Excel and CSV
-        files keep raw numbers so you can pivot them yourself.
+        The PDF is laid out for reading and printing. Excel and CSV files keep raw numbers so you can pivot
+        them yourself.
       </p>
     </Card>
   )
