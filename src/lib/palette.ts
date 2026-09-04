@@ -1,19 +1,15 @@
 /**
  * Chart palette.
  *
- * These are the eight validated categorical slots from the data-viz method,
- * stepped once for the light surface (#ffffff) and once for the dark surface
- * (#12151c). Both sets pass the lightness band, chroma floor, adjacent-pair CVD
- * separation and normal-vision floor checks. Three light slots (aqua, yellow,
- * magenta) sit under 3:1 against white, so every chart that uses them also
- * ships direct labels, a legend and a table view — that is the relief rule, not
- * an optional nicety.
+ * The validated categorical slots from the data-viz method, stepped once for
+ * the light surface (#ffffff) and once for the dark surface (#12151c). Both
+ * sets pass the lightness band, chroma floor, colour-blind separation and
+ * normal-vision floor checks.
  *
- * Slots are assigned in fixed order and never cycled. A ninth series folds into
- * "Other", which is why `Other` here is deliberately a neutral, not a hue.
+ * This app plots very little — a score line per bureau — so only the first few
+ * slots see use, but the set stays intact so anything added later inherits the
+ * same guarantees.
  */
-
-import type { ExpenseCategory, InvestmentType } from '../types'
 
 export type Mode = 'light' | 'dark'
 
@@ -39,12 +35,6 @@ export const SERIES_DARK = [
   '#e66767',
 ] as const
 
-/**
- * The first three slots are the only ones that clear the all-pairs floors, so
- * scatter/bubble-style charts (where every pair is adjacent) cap here.
- */
-export const ALL_PAIRS_SAFE_COUNT = 3
-
 export const NEUTRAL_SERIES: Record<Mode, string> = {
   light: '#98a1b0',
   dark: '#5e6675',
@@ -60,56 +50,8 @@ export function seriesColor(index: number, mode: Mode): string {
   return index >= 0 && index < list.length ? list[index] : NEUTRAL_SERIES[mode]
 }
 
-/* -------------------------------------------------------------------------- */
-/* Fixed entity → slot assignments                                            */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Color follows the entity, never its rank — so a filter that drops a category
- * must not repaint the survivors. These maps are the single source of truth.
- */
-const EXPENSE_SLOT: Record<ExpenseCategory, number> = {
-  Rent: 0,
-  'Food & Dining': 1,
-  Transport: 2,
-  Shopping: 3,
-  'Loan Payment': 4,
-  Investments: 5,
-  'Bills & Utilities': 6,
-  Entertainment: 7,
-  Other: -1, // neutral by design — the documented ninth-series fold
-}
-
-export function categoryColor(category: string, mode: Mode): string {
-  const slot = EXPENSE_SLOT[category as ExpenseCategory]
-  return slot === undefined ? NEUTRAL_SERIES[mode] : seriesColor(slot, mode)
-}
-
-const INVESTMENT_SLOT: Record<InvestmentType, number> = {
-  TFSA: 0,
-  RRSP: 2,
-  FHSA: 6,
-  'Non-registered': 3,
-  GIC: 1,
-  Crypto: 4,
-  Other: -1,
-}
-
-export function investmentColor(type: string, mode: Mode): string {
-  const slot = INVESTMENT_SLOT[type as InvestmentType]
-  return slot === undefined ? NEUTRAL_SERIES[mode] : seriesColor(slot, mode)
-}
-
-/* -------------------------------------------------------------------------- */
-/* Semantic roles                                                             */
-/* -------------------------------------------------------------------------- */
-
-/** Income vs expense: blue (slot 1) vs orange (slot 2) — never green/red, which
- *  are reserved for status. Direction is carried by the axis and the label. */
-export const FLOW_COLORS: Record<Mode, { income: string; expense: string; net: string }> = {
-  light: { income: '#2a78d6', expense: '#eb6834', net: '#4a3aa7' },
-  dark: { income: '#3987e5', expense: '#d95926', net: '#9085e9' },
-}
+/** Fixed per bureau, so a line never changes colour between renders. */
+export const BUREAU_SLOT = { Equifax: 0, TransUnion: 6 } as const
 
 /** Status palette — fixed across themes, always shipped with an icon + label. */
 export const STATUS_COLORS = {
@@ -120,23 +62,6 @@ export const STATUS_COLORS = {
 } as const
 
 export type StatusTone = keyof typeof STATUS_COLORS
-
-/** Sequential blue ramp (light → dark), for magnitude encodings. */
-export const SEQUENTIAL_BLUE = [
-  '#cde2fb',
-  '#b7d3f6',
-  '#9ec5f4',
-  '#86b6ef',
-  '#6da7ec',
-  '#5598e7',
-  '#3987e5',
-  '#2a78d6',
-  '#256abf',
-  '#1c5cab',
-  '#184f95',
-  '#104281',
-  '#0d366b',
-] as const
 
 /* -------------------------------------------------------------------------- */
 /* Chart chrome                                                               */
@@ -150,7 +75,7 @@ export interface ChartTheme {
   tick: string
   label: string
   ink: string
-  /** Gap/ring color used to separate touching marks — always the surface. */
+  /** Gap/ring colour used to separate touching marks — always the surface. */
   gap: string
 }
 

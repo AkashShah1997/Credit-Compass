@@ -1,10 +1,9 @@
-import { Sparkles, X } from 'lucide-react'
-import { NAV_GROUPS, SETTINGS_ITEM, type NavItem } from './nav'
+import { Compass, X } from 'lucide-react'
+import { NAV_ITEMS, type NavItem } from './nav'
 import { cn } from '../../lib/cn'
-import { useAppState } from '../../store/AppStore'
-import { netWorthBreakdown } from '../../lib/finance'
-import { formatCompactCurrency } from '../../lib/format'
 import { APP_NAME, APP_TAGLINE } from '../../lib/brand'
+import { useAppState } from '../../store/AppStore'
+import { scoreBand, scoreTrend } from '../../lib/credit'
 import { hrefFor } from '../../hooks/useRouter'
 import { IconButton } from '../ui/Button'
 
@@ -16,7 +15,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13.5px] font-medium transition-colors duration-150',
+        'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-colors duration-150',
         active ? 'bg-brand-soft text-brand-ink' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink',
       )}
     >
@@ -29,7 +28,7 @@ function NavLink({ item, active, onNavigate }: { item: NavItem; active: boolean;
   )
 }
 
-export function SidebarContent({
+function SidebarContent({
   currentPath,
   onNavigate,
   onClose,
@@ -39,14 +38,15 @@ export function SidebarContent({
   onClose?: () => void
 }) {
   const state = useAppState()
-  const worth = netWorthBreakdown(state)
+  const trend = scoreTrend(state.creditScores)
+  const band = trend.latest ? scoreBand(trend.latest.score) : null
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-2 px-5 py-4">
         <a href={hrefFor('/')} onClick={onNavigate} className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-on-brand">
-            <Sparkles className="h-[18px] w-[18px]" aria-hidden="true" />
+            <Compass className="h-[18px] w-[18px]" aria-hidden="true" />
           </span>
           <span>
             <span className="block text-[15px] leading-tight font-semibold tracking-[-0.02em] text-ink">{APP_NAME}</span>
@@ -60,31 +60,29 @@ export function SidebarContent({
         ) : null}
       </div>
 
-      <nav className="scrollbar-slim flex-1 overflow-y-auto px-3 pb-4">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="mb-4">
-            <p className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-[0.08em] text-muted uppercase">
-              {group.label}
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {group.items.map((item) => (
-                <NavLink key={item.path} item={item} active={currentPath === item.path} onNavigate={onNavigate} />
-              ))}
-            </div>
-          </div>
-        ))}
+      <nav className="flex-1 px-3 pb-4">
+        <div className="flex flex-col gap-0.5">
+          {NAV_ITEMS.map((item) => (
+            <NavLink key={item.path} item={item} active={currentPath === item.path} onNavigate={onNavigate} />
+          ))}
+        </div>
       </nav>
 
       <div className="border-t border-hairline px-3 py-3">
-        <NavLink item={SETTINGS_ITEM} active={currentPath === SETTINGS_ITEM.path} onNavigate={onNavigate} />
-        <div className="mt-3 rounded-xl bg-surface-2 px-3 py-2.5">
-          <p className="text-[11px] text-muted">Net worth</p>
-          <p className="mt-0.5 text-[17px] font-semibold tracking-[-0.02em] text-ink">
-            {formatCompactCurrency(worth.netWorth)}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted">
-            {formatCompactCurrency(worth.totalAssets)} assets · {formatCompactCurrency(worth.totalLiabilities)} owed
-          </p>
+        <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+          <p className="text-[11px] text-muted">Latest score</p>
+          {trend.latest && band ? (
+            <>
+              <p className="tabular mt-0.5 text-[22px] leading-none font-semibold tracking-[-0.02em] text-ink">
+                {trend.latest.score}
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                {band.label} · {trend.latest.bureau}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-[12px] text-muted">Not logged yet</p>
+          )}
         </div>
       </div>
     </div>
@@ -94,8 +92,8 @@ export function SidebarContent({
 export function Sidebar({ currentPath }: { currentPath: string }) {
   return (
     // Sticky rather than fixed: the shell is a flex row, so the sidebar keeps
-    // its own scroll without the main column needing a matching left padding.
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 border-r border-hairline bg-surface lg:block">
+    // its own scroll without the main column needing matching left padding.
+    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-hairline bg-surface lg:block">
       <SidebarContent currentPath={currentPath} />
     </aside>
   )
@@ -114,7 +112,7 @@ export function MobileDrawer({
   return (
     <div className="fixed inset-0 z-50 lg:hidden">
       <div className="absolute inset-0 animate-fade-in bg-overlay" onClick={onClose} aria-hidden="true" />
-      <div className="relative h-full w-[17rem] max-w-[85vw] animate-slide-in border-r border-hairline bg-surface shadow-modal">
+      <div className="relative h-full w-[16rem] max-w-[85vw] animate-slide-in border-r border-hairline bg-surface shadow-modal">
         <SidebarContent currentPath={currentPath} onNavigate={onClose} onClose={onClose} />
       </div>
     </div>

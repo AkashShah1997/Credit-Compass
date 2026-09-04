@@ -2,28 +2,30 @@
  * "Ask an AI" — turns the workspace into a plain-text briefing you can paste
  * into any assistant for a second opinion.
  *
- * Anonymous by construction: no name, no card numbers, no transaction lines.
- * Just the facts a credit-scoring question needs, in Markdown that every chat
- * assistant renders cleanly. Pure: state in, string out.
+ * Anonymous by construction: no name, no account numbers. Just the facts a
+ * credit-scoring question needs, in Markdown that every chat assistant renders
+ * cleanly. Pure: state in, string out.
  */
 
-import type { AppState, CreditBureau } from '../types'
+import type { AppState } from '../types'
 import { CREDIT_BUREAUS } from '../types'
-import { creditOverview, scoreBand, signedPoints, sortedScores, type Impact, type Timing } from './credit'
 import {
-  cardIsPaid,
-  emergencyFund,
-  isLiquidAsset,
-  monthlySeries,
-  salaryDayPlan,
-  summariseLoan,
-} from './finance'
-import { formatDate, monthKey, monthLabel, monthRange, monthsSince, todayISO } from './date'
+  UTILISATION_HEALTHY,
+  accountAges,
+  creditRecommendations,
+  inquirySummary,
+  scoreBand,
+  scoreTrend,
+  signedPoints,
+  sortedScores,
+  utilisationSummary,
+  type Impact,
+  type Timing,
+} from './credit'
+import { formatDate, monthKey, monthLabel, monthsSince, todayISO } from './date'
 import { formatCurrency, formatPercent, formatTenure, ordinal } from './format'
 
 export interface PromptOptions {
-  /** Income, liquid savings, surplus and commitments — what is actually affordable. */
-  includeCashFlow: boolean
   /** The app's own recommendation list, so the assistant can agree, disagree or add. */
   includeAppSuggestions: boolean
   /** Every reading rather than just the latest per bureau. */
@@ -31,7 +33,6 @@ export interface PromptOptions {
 }
 
 export const DEFAULT_PROMPT_OPTIONS: PromptOptions = {
-  includeCashFlow: true,
   includeAppSuggestions: true,
   includeScoreHistory: true,
 }
@@ -53,19 +54,19 @@ export function buildCreditPrompt(
   options: PromptOptions = DEFAULT_PROMPT_OPTIONS,
   today = todayISO(),
 ): string {
-  const overview = creditOverview(state, today)
-  const { trend, utilisation, inquiries, ages, payments, recommendations } = overview
-  const goal = state.settings.creditScoreGoal
+  const trend = scoreTrend(state.creditScores, today)
+  const utilisation = utilisationSummary(state.accounts, today)
+  const ages = accountAges(state, today)
+  const inquiries = inquirySummary(state.inquiries, today)
   const out: string[] = []
 
-  /* Intro ----------------------------------------------------------------- */
   out.push(
-    `I am a Canadian consumer working on my credit score. Below is my complete credit picture as of ${formatDate(today)}, exported from a personal tracking app. All amounts are Canadian dollars. Please answer as someone who knows how Equifax Canada and TransUnion Canada weigh a file.`,
+    `I am in Canada and working on my credit score. Below is my full credit picture as of ${formatDate(today)}, exported from a tracking app I use. All amounts are Canadian dollars. Please answer as someone who knows how Equifax Canada and TransUnion Canada weigh a file.`,
     '',
   )
 
   /* Scores ---------------------------------------------------------------- */
-  out.push('## Credit score', bullet(`Goal: ${goal} (Equifax's "Excellent" band starts at 760)`))
+  out.push('## Credit score', bullet(`My goal: ${state.settings.scoreGoal}`))
   if (!trend.latest) {
     out.push(bullet('I have not logged a score reading yet.'))
   } else {
@@ -74,19 +75,16 @@ export function buildCreditPrompt(
       if (!reading) continue
       out.push(
         bullet(
-          `Latest ${bureau} reading: ${reading.score} on ${formatDate(reading.date)}${reading.source ? ` (${reading.source})` : ''} — "${scoreBand(reading.score).label}" band`,
+          `Latest ${bureau}: ${reading.score} on ${formatDate(reading.date)}${reading.source ? ` (${reading.source})` : ''} — "${scoreBand(reading.score).label}" band`,
         ),
       )
     }
-    if (trend.peak && trend.peak !== trend.latest) {
+    if (trend.peak && trend.peak !== trend.latest && trend.changeSincePeak != null) {
       out.push(
         bullet(
-          `Highest ${trend.latest.bureau} reading on file: ${trend.peak.score} on ${formatDate(trend.peak.date)} (${signedPoints(trend.changeSincePeak ?? 0)} since)`,
+          `Highest ${trend.latest.bureau} reading on file: ${trend.peak.score} on ${formatDate(trend.peak.date)} — ${signedPoints(trend.changeSincePeak)} since then`,
         ),
       )
-    }
-    if (trend.changeSincePrevious != null && trend.previous) {
-      out.push(bullet(`Change since the previous ${trend.latest.bureau} reading (${formatDate(trend.previous.date)}): ${signedPoints(trend.changeSincePrevious)}`))
     }
   }
 
@@ -100,30 +98,46 @@ export function buildCreditPrompt(
   }
   out.push('')
 
+  /* History length -------------------------------------------------------- */
+  out.push('## How long I have had credit')
+  if (ages.oldestMonths != null) {
+    out.push(
+      bullet(
+        `About ${formatTenure(ages.oldestMonths)} of credit history in Canada${ages.thinFile ? ' — still a relatively young file' : ''}.`,
+      ),
+    )
+  } else {
+    out.push(bullet('I have not recorded when my credit history started.'))
+  }
+  if (ages.averageMonths != null) {
+    out.push(bullet(`Average age across my open accounts: ${formatTenure(ages.averageMonths)}.`))
+  }
+  if (ages.newCount) out.push(bullet(`${plural(ages.newCount, 'account')} opened in the last 12 months.`))
+  out.push('')
+
   /* Revolving ------------------------------------------------------------- */
-  out.push('## Revolving credit (cards and lines of credit)')
+  out.push('## Cards and lines of credit')
   if (utilisation.accounts.length === 0) {
     out.push(bullet('None — I have no credit card or line of credit reporting.'))
   } else {
-    for (const account of utilisation.accounts) {
-      const { card } = account
-      const opened = card.openedDate
-        ? `opened ${monthLabel(monthKey(card.openedDate))} (${formatTenure(monthsSince(card.openedDate, today))} ago)`
+    for (const row of utilisation.accounts) {
+      const { account } = row
+      const opened = account.openedDate
+        ? `opened ${monthLabel(monthKey(account.openedDate))} (${formatTenure(monthsSince(account.openedDate, today))} ago)`
         : 'opening date not recorded'
-      const soon = account.daysToStatement === 0 ? 'today' : `in ${plural(account.daysToStatement, 'day')}`
       out.push(
         bullet(
-          `${card.name} — ${card.kind ?? 'Credit Card'} from ${card.issuer}. Limit ${formatCurrency(card.creditLimit)}; statement balance ${formatCurrency(card.outstanding)} (${formatPercent(account.percent, 0)} utilization); statement closes on the ${ordinal(card.statementDay)} (next: ${formatDate(account.statementDate)}, ${soon}); payment due on the ${ordinal(card.billDueDay)}${card.apr != null ? `; APR ${formatPercent(card.apr, 2)}` : ''}; ${opened}; this cycle's bill ${cardIsPaid(card, monthKey(today)) ? 'already paid' : 'not yet paid'}.`,
+          `${account.name} — ${account.kind}. Limit ${formatCurrency(account.limit)}; balance ${formatCurrency(account.balance)} (${formatPercent(row.percent, 0)} utilization); statement closes on the ${ordinal(account.statementDay)} (next ${formatDate(row.statementDate)}, in ${plural(row.daysToStatement, 'day')})${account.apr != null ? `; APR ${formatPercent(account.apr, 2)}` : ''}; ${opened}.`,
         ),
       )
     }
     out.push(
       bullet(
-        `Overall: ${formatCurrency(utilisation.totalBalance)} of ${formatCurrency(utilisation.totalLimit)} in use (${formatPercent(utilisation.percent, 0)}).${
+        `Overall: ${formatCurrency(utilisation.totalBalance)} of ${formatCurrency(utilisation.totalLimit)} (${formatPercent(utilisation.percent, 0)}).${
           utilisation.toHealthy > 0
-            ? ` Reporting under 30% would take a payment of ${formatCurrency(utilisation.toHealthy)} before the statement date; under 10% would take ${formatCurrency(utilisation.toIdeal)}.`
+            ? ` Getting under ${UTILISATION_HEALTHY}% before the statement date would take ${formatCurrency(utilisation.toHealthy)}; under 10% would take ${formatCurrency(utilisation.toIdeal)}.`
             : utilisation.toIdeal > 0
-              ? ` Already under 30%; ${formatCurrency(utilisation.toIdeal)} more would report under 10%.`
+              ? ` Already under ${UTILISATION_HEALTHY}%; ${formatCurrency(utilisation.toIdeal)} more would report under 10%.`
               : ' Already under 10%.'
         }`,
       ),
@@ -132,16 +146,14 @@ export function buildCreditPrompt(
   out.push('')
 
   /* Loans ----------------------------------------------------------------- */
-  out.push('## Instalment loans')
-  if (state.loans.length === 0) {
+  out.push('## Loans')
+  if (state.debts.length === 0) {
     out.push(bullet('None.'))
   } else {
-    for (const loan of state.loans) {
-      const summary = summariseLoan(loan)
-      const closed = loan.paidMonths >= loan.tenureMonths
+    for (const debt of state.debts) {
       out.push(
         bullet(
-          `${loan.name} — ${loan.type} from ${loan.lender}. Borrowed ${formatCurrency(loan.principal)} at ${formatPercent(loan.interestRate, 2)} over ${plural(loan.tenureMonths, 'month')}; ${formatCurrency(loan.paymentAmount)}/month; ${loan.paidMonths} of ${loan.tenureMonths} payments made; about ${formatCurrency(summary.outstanding)} outstanding; opened ${formatDate(loan.startDate)} (${formatTenure(monthsSince(loan.startDate, today))} ago); status: ${closed ? 'paid off' : loan.active ? 'active' : 'inactive'}.`,
+          `${debt.name} — ${debt.kind}, ${formatCurrency(debt.monthlyPayment)}/month, started ${formatDate(debt.startDate)} (${formatTenure(monthsSince(debt.startDate, today))} ago).`,
         ),
       )
     }
@@ -151,76 +163,40 @@ export function buildCreditPrompt(
   /* Inquiries ------------------------------------------------------------- */
   out.push('## Hard inquiries')
   if (inquiries.all.length === 0) {
-    out.push(bullet('None recorded in the last three years.'))
+    out.push(bullet('None recorded.'))
   } else {
     for (const status of inquiries.all) {
-      const { inquiry } = status
-      const window = status.weighing
-        ? `still weighing on the score until ${formatDate(status.impactEnds)}; visible until ${formatDate(status.dropsOff)}`
-        : status.onReport
-          ? `no longer weighing on the score; visible until ${formatDate(status.dropsOff)}`
-          : 'off the report'
       out.push(
         bullet(
-          `${formatDate(inquiry.date)} — ${inquiry.lender}, ${inquiry.purpose.toLowerCase()}${inquiry.bureau ? ` (${inquiry.bureau})` : ''}. ${window[0].toUpperCase()}${window.slice(1)}.`,
+          `${formatDate(status.inquiry.date)} — ${status.inquiry.lender}${status.inquiry.purpose ? `, ${status.inquiry.purpose.toLowerCase()}` : ''}. ${
+            status.weighing
+              ? `Still counting against the score until ${formatDate(status.impactEnds)}; visible until ${formatDate(status.dropsOff)}.`
+              : status.onReport
+                ? `No longer counting; visible until ${formatDate(status.dropsOff)}.`
+                : 'Off the report.'
+          }`,
         ),
       )
     }
   }
   out.push('')
 
-  /* Payment history & age ------------------------------------------------- */
-  out.push('## Payment history, account age and mix')
-  if (payments.overdueCards.length === 0 && payments.loansBehind.length === 0) {
-    out.push(bullet('No late or missed payments recorded on any account in the app.'))
-  } else {
-    for (const { card, daysLate } of payments.overdueCards) {
-      out.push(bullet(`${card.name}: this cycle's bill is ${plural(daysLate, 'day')} past its due date and unpaid.`))
-    }
-    for (const { loan, missed } of payments.loansBehind) {
-      out.push(bullet(`${loan.name}: ${plural(missed, 'scheduled payment')} not recorded.`))
-    }
-  }
-  if (payments.onTimeLoanPayments > 0) out.push(bullet(`${plural(payments.onTimeLoanPayments, 'loan payment')} recorded on time.`))
-  if (ages.accounts.length) {
-    out.push(
-      bullet(
-        `Average account age ${formatTenure(ages.averageMonths ?? 0)}; oldest account ${ages.oldest?.label} (${formatTenure(ages.oldest?.months ?? 0)})${
-          ages.newCount ? `; ${plural(ages.newCount, 'account')} under a year old` : ''
-        }${ages.unknownCount ? `; ${plural(ages.unknownCount, 'card')} without a recorded opening date` : ''}.`,
-      ),
-    )
-  }
+  /* Payment history ------------------------------------------------------- */
+  out.push('## Payment history')
   out.push(
-    bullet(`Credit mix: ${plural(state.cards.length, 'revolving account')}, ${plural(state.loans.filter((l) => l.active).length, 'active instalment loan')}.`),
+    bullet(
+      state.settings.missedPaymentLast2Years
+        ? 'I have had at least one missed or late payment in the last 2 years.'
+        : 'No missed or late payments in the last 2 years.',
+    ),
+  )
+  out.push(
+    bullet(`Credit mix: ${plural(state.accounts.length, 'revolving account')}, ${plural(state.debts.length, 'instalment loan')}.`),
     '',
   )
 
-  /* Cash flow ------------------------------------------------------------- */
-  if (options.includeCashFlow) {
-    const liquid = state.assets.filter(isLiquidAsset).reduce((sum, asset) => sum + asset.value, 0)
-    const recent = monthlySeries(state.transactions, monthRange(6, monthKey(today)))
-    const withData = recent.filter((row) => row.income > 0 || row.expense > 0)
-    const surplus = withData.length ? withData.reduce((sum, row) => sum + row.net, 0) / withData.length : null
-    const ef = emergencyFund(state.goals)
-    const plan = salaryDayPlan(state)
-    const commitments = plan.commitments.filter((c) => c.kind !== 'Card')
-
-    out.push('## Cash-flow context (what I can afford)')
-    out.push(bullet(`Monthly take-home pay: ${formatCurrency(state.settings.monthlySalary)}`))
-    out.push(bullet(`Liquid savings (chequing, savings, cash): ${formatCurrency(liquid)}`))
-    if (surplus != null) {
-      out.push(bullet(`Average monthly surplus over the last ${plural(withData.length, 'month')} with activity: ${surplus >= 0 ? '+' : '−'}${formatCurrency(Math.abs(surplus))}`))
-    }
-    if (ef) out.push(bullet(`Emergency fund: ${formatCurrency(ef.saved)} saved of a ${formatCurrency(ef.target)} target`))
-    if (commitments.length) {
-      out.push(bullet(`Fixed monthly commitments: ${commitments.map((c) => `${c.label} ${formatCurrency(c.amount)}`).join('; ')}`))
-    }
-    if (plan.plannedSavings > 0) out.push(bullet(`Planned savings-goal contributions: ${formatCurrency(plan.plannedSavings)}/month`))
-    out.push('')
-  }
-
   /* App suggestions ------------------------------------------------------- */
+  const recommendations = creditRecommendations(state, today)
   if (options.includeAppSuggestions && recommendations.length) {
     out.push('## What my tracking app currently suggests')
     recommendations.forEach((rec, index) => {
@@ -232,16 +208,16 @@ export function buildCreditPrompt(
   /* The ask --------------------------------------------------------------- */
   out.push('## What I would like from you')
   out.push(
-    '1. Rank the actions that would raise my score the most over the next 3, 6 and 12 months. For each one, give the expected effect, when it would show up on the report, and what it costs me.',
-    '2. Explain what most likely caused the drop from my peak and how long recovery normally takes for a file like this.',
-    '3. Tell me what not to do — applications, closures, balance moves — and why.',
+    '1. Rank what would raise my score the most over the next 3, 6 and 12 months. For each, give the expected effect, when it would show up, and what it costs me.',
+    '2. Explain what most likely caused the drop from my peak, and how long recovery normally takes for a file like this.',
+    '3. Tell me what NOT to do — applications, closures, balance transfers — and why.',
   )
   if (options.includeAppSuggestions && recommendations.length) {
     out.push("4. Where the app's suggestions above are wrong, incomplete or badly ordered, say so.")
   }
   out.push(
     '',
-    'Be specific to these numbers rather than generic, and say where you are uncertain. This is for my own information; I understand it is not professional financial advice.',
+    'Be specific to these numbers rather than generic, and say where you are uncertain. I understand this is general information and not professional financial advice.',
   )
 
   return out.join('\n')
@@ -250,11 +226,4 @@ export function buildCreditPrompt(
 /** Rough size check for the copy button — most assistants take far more than this. */
 export function promptStats(text: string): { characters: number; words: number } {
   return { characters: text.length, words: text.split(/\s+/).filter(Boolean).length }
-}
-
-/** Which bureau a source usually reports, so the modal can pre-select sensibly. */
-export function bureauForSource(source: string): CreditBureau | null {
-  if (/borrowell|cibc|equifax/i.test(source)) return 'Equifax'
-  if (/credit karma|transunion|mogo/i.test(source)) return 'TransUnion'
-  return null
 }

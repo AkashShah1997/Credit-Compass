@@ -1,26 +1,20 @@
 /**
- * Persistence layer.
+ * Persistence.
  *
- * Feature code never touches `localStorage` directly — it goes through
- * `FinanceRepository`. The interface is async so that swapping in an HTTP or
- * IndexedDB implementation later is a one-line change in `repository`, with no
- * edits anywhere else. `loadSync` is an optional fast path that local storage
- * can honour (and a network backend simply won't), letting the app hydrate
- * without a loading flash today while staying correct tomorrow.
+ * The browser's local storage, and nothing else. No account, no sync, no
+ * server — which is the point: real credit figures never leave the machine
+ * they were typed on. The trade-off is that clearing site data wipes the
+ * workspace, so `lib/backup.ts` exists to move it to a file you own.
  */
 
-import type { AppState } from '../types'
-import { buildSeedState } from './seed'
-import { APP_NAME, STORAGE_NAMESPACE } from './brand'
+import type { AppState, Settings } from '../types'
+import { STORAGE_NAMESPACE } from './brand'
 
-export const STORAGE_KEY = `${STORAGE_NAMESPACE}.state.v1`
+export const STORAGE_KEY = `${STORAGE_NAMESPACE}.state.v2`
 export const THEME_KEY = `${STORAGE_NAMESPACE}.theme`
-export const STATE_VERSION = 1
+export const STATE_VERSION = 2
 
-/** The key used before the rename — read as a fallback so nobody loses a workspace. */
-const LEGACY_STORAGE_KEY = 'moneyflow.state.v1'
-
-export interface FinanceRepository {
+export interface Repository {
   /** Immediate read, when the backing store supports it. */
   loadSync?(): AppState | null
   load(): Promise<AppState | null>
@@ -30,7 +24,7 @@ export interface FinanceRepository {
 
 function isStorageAvailable(): boolean {
   try {
-    const probe = '__mf_probe__'
+    const probe = '__cc_probe__'
     window.localStorage.setItem(probe, '1')
     window.localStorage.removeItem(probe)
     return true
@@ -39,47 +33,69 @@ function isStorageAvailable(): boolean {
   }
 }
 
-/**
- * Fill in anything a stored payload is missing. Older snapshots (and hand-edited
- * imports) shouldn't crash the app just because a field was added since.
- */
-export function migrate(raw: unknown): AppState | null {
-  if (!raw || typeof raw !== 'object') return null
-  const input = raw as Partial<AppState>
-  const base = buildSeedState()
-
-  const state: AppState = {
-    version: STATE_VERSION,
-    settings: { ...base.settings, ...(input.settings ?? {}) },
-    transactions: Array.isArray(input.transactions) ? input.transactions : [],
-    budgets: input.budgets && typeof input.budgets === 'object' ? input.budgets : {},
-    goals: Array.isArray(input.goals) ? input.goals : [],
-    investments: Array.isArray(input.investments) ? input.investments : [],
-    loans: Array.isArray(input.loans) ? input.loans : [],
-    cards: Array.isArray(input.cards) ? input.cards : [],
-    assets: Array.isArray(input.assets) ? input.assets : [],
-    liabilities: Array.isArray(input.liabilities) ? input.liabilities : [],
-    creditScores: Array.isArray(input.creditScores) ? input.creditScores : [],
-    inquiries: Array.isArray(input.inquiries) ? input.inquiries : [],
-    dismissedAlerts: Array.isArray(input.dismissedAlerts) ? input.dismissedAlerts : [],
+export function defaultSettings(): Settings {
+  return {
+    // The bottom of Equifax Canada's "excellent" band — where the best rates start.
+    scoreGoal: 760,
+    missedPaymentLast2Years: false,
+    reminderLeadDays: 5,
+    theme: 'system',
   }
-
-  // Goals gained a contributions log after v0; backfill so the UI can map it.
-  state.goals = state.goals.map((g) => ({ ...g, contributions: g.contributions ?? [] }))
-  state.investments = state.investments.map((i) => ({ ...i, history: i.history ?? [] }))
-
-  return state
 }
 
-class LocalStorageRepository implements FinanceRepository {
+export function emptyState(): AppState {
+  return {
+    version: STATE_VERSION,
+    settings: defaultSettings(),
+    accounts: [],
+    debts: [],
+    creditScores: [],
+    inquiries: [],
+    dismissedAlerts: [],
+  }
+}
+
+const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : [])
+
+/**
+ * Fill in anything a stored or imported payload is missing.
+ *
+ * Returns null only when the object is not a workspace at all. Anything that
+ * has the right shape is accepted and completed from defaults, so a backup
+ * written by an older build — or hand-edited — still opens.
+ */
+export function migrate(raw: unknown): AppState | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const input = raw as Partial<AppState>
+
+  // The one structural requirement: it has to carry at least one of the
+  // collections this app is built around.
+  const looksRight =
+    Array.isArray(input.accounts) ||
+    Array.isArray(input.debts) ||
+    Array.isArray(input.creditScores) ||
+    Array.isArray(input.inquiries)
+  if (!looksRight) return null
+
+  return {
+    version: STATE_VERSION,
+    settings: { ...defaultSettings(), ...(input.settings ?? {}) },
+    accounts: asArray(input.accounts),
+    debts: asArray(input.debts),
+    creditScores: asArray(input.creditScores),
+    inquiries: asArray(input.inquiries),
+    dismissedAlerts: asArray<string>(input.dismissedAlerts),
+  }
+}
+
+class LocalStorageRepository implements Repository {
   private memory: AppState | null = null
   private available = isStorageAvailable()
 
   loadSync(): AppState | null {
     if (!this.available) return this.memory
     try {
-      const raw =
-        window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY)
+      const raw = window.localStorage.getItem(STORAGE_KEY)
       if (!raw) return null
       return migrate(JSON.parse(raw))
     } catch {
@@ -114,18 +130,9 @@ class LocalStorageRepository implements FinanceRepository {
   }
 }
 
-export const repository: FinanceRepository = new LocalStorageRepository()
+export const repository: Repository = new LocalStorageRepository()
 
-/* -------------------------------------------------------------------------- */
-/* Import / export of the whole workspace                                     */
-/* -------------------------------------------------------------------------- */
-
-export function serializeState(state: AppState): string {
-  return JSON.stringify(state, null, 2)
-}
-
-export function deserializeState(json: string): AppState {
-  const parsed = migrate(JSON.parse(json))
-  if (!parsed) throw new Error(`That file does not look like a ${APP_NAME} backup.`)
-  return parsed
+/** Whether the browser will actually keep what we save — surfaced in Settings. */
+export function storageWorks(): boolean {
+  return isStorageAvailable()
 }

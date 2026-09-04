@@ -117,6 +117,11 @@ export function startOfMonth(key: string): string {
   return `${key}-01`
 }
 
+/** `2026-09` from a `<input type="month">` → `2026-09-01`. */
+export function monthStartISO(monthValue: string): string {
+  return `${monthValue}-01`
+}
+
 export function endOfMonth(key: string): string {
   return `${key}-${String(daysInMonth(key)).padStart(2, '0')}`
 }
