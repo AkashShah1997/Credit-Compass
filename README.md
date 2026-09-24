@@ -6,6 +6,18 @@ It asks for about a dozen numbers, once. Then one number a month.
 
 Everything runs in your browser. No account, no server, no analytics, no network call with your data — ever. Your workspace lives in this browser's local storage, and a downloadable file is how you back it up or move it.
 
+## Contents
+
+- [What you actually have to enter](#what-you-actually-have-to-enter)
+- [Running it](#running-it)
+- [Deploying](#deploying)
+- [Your data file](#your-data-file)
+- [What the credit page shows](#what-the-credit-page-shows)
+- [The rules behind the advice](#the-rules-behind-the-advice)
+- [How it is put together](#how-it-is-put-together)
+- [Design notes](#design-notes)
+- [Known limitations](#known-limitations)
+
 ## What you actually have to enter
 
 | | Fields |
