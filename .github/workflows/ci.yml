@@ -1,0 +1,41 @@
+# Runs on every push to main and on every pull request.
+#
+# `npm run build` is `tsc -b && vite build`, so this one step covers both the
+# typecheck and the production bundle — which is the thing that actually has to
+# work, since a build that only passes locally is how a blank page reached
+# production once already.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run irrelevant; cancel it
+# rather than paying for both.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Lint & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # `ci` not `install`: installs exactly what package-lock.json pins and
+      # fails if the two have drifted, which is what you want on a build server.
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run build

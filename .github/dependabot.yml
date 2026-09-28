@@ -1,0 +1,36 @@
+# Dependabot *version updates* — routine "a newer release exists" pull requests.
+#
+# Worth being clear about the distinction, because only one of these is a file:
+#
+#   * Version updates (this file) keep dependencies current on a schedule.
+#   * Security updates and Dependabot alerts are repository settings, not
+#     config. Turn them on under Settings -> Code security. Nothing in the repo
+#     enables them, and no workflow is needed for them to run.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Without grouping this repo would open a separate PR per package every
+    # week. Two PRs — one for app dependencies, one for tooling — is reviewable;
+    # fifteen is noise that gets ignored, which defeats the point.
+    groups:
+      production-dependencies:
+        dependency-type: production
+      development-dependencies:
+        dependency-type: development
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+
+  # Keeps actions/checkout and actions/setup-node current. Cheap, and stale
+  # action versions are a common source of sudden CI breakage.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci

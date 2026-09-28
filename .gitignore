@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Workspace backups exported from the app. These hold real credit figures —
+# account limits, balances, score readings — and must never reach the repo.
+CreditCompass-backup-*.json
+*-backup-*.json
+
 # Editor directories and files
 .claude/
 .vscode/*
