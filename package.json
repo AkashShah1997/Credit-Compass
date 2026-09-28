@@ -15,6 +15,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "lucide-react": "^1.29.0",
+    "minimist": "1.2.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "recharts": "^3.10.1",
