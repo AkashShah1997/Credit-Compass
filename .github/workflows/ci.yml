@@ -39,3 +39,25 @@ jobs:
       - run: npm run lint
 
       - run: npm run build
+
+      # Everything below publishes the build for release use, and only on a
+      # push to main. Pull requests still run lint and build above — they just
+      # do not produce an artifact, since nothing has been merged yet.
+      - name: Read version from package.json
+        id: pkg
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload production build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: credit-compass-v${{ steps.pkg.outputs.version }}-dist
+          # `path: dist` uploads the folder's *contents*, so the zip opens
+          # straight onto index.html rather than a nested dist/ directory.
+          path: dist
+          # A silently empty artifact is worse than a failed build: it looks
+          # like a successful release right up until someone downloads it.
+          if-no-files-found: error
+          retention-days: 30
