@@ -1,6 +1,6 @@
 # CreditCompass
 
-A credit-score tool for Canada. It answers one question: **what is my score doing, why, and what do I do next?**
+A privacy-first credit-score tool for Canada. It answers one question: **what is my score doing, why, and what do I do next?**
 
 It asks for about a dozen numbers, once. Then one number a month.
 
